@@ -164,7 +164,7 @@ private fun Identity(build: BuildInfo, onOpenLicense: () -> Unit) {
         Spacer(Modifier.height(14.dp))
         Text("Limenty", style = LimentyText.Heading)
         Spacer(Modifier.height(2.dp))
-        Text("SSH terminal for Android", style = LimentyText.Secondary)
+        Text("An SSH terminal for Android, built for touch.", style = LimentyText.Secondary)
         Spacer(Modifier.height(20.dp))
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             BuildRow("Version", build.version) { copy(context, "Version", build.version) }
