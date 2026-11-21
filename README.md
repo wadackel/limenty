@@ -4,7 +4,7 @@
 
 # Limenty
 
-**An SSH terminal for Android, built for tmux, Neovim and typing on a phone.**
+**An SSH terminal for Android, built for touch.**
 
 [Features](#features) · [Building](#building) · [Architecture](docs/architecture.md) · [Security](docs/security.md)
 

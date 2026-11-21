@@ -141,7 +141,7 @@ class BackNavigationTest {
     fun backFromAboutReturnsToTheSettingsIndex() {
         openSettings()
         rule.onNodeWithText("About Limenty").performScrollTo().performClick()
-        awaitText("SSH terminal for Android")
+        awaitText("An SSH terminal for Android, built for touch.")
 
         Espresso.pressBack()
 
