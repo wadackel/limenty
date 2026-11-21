@@ -55,6 +55,7 @@ import dev.wadackel.limenty.ui.hosts.rememberSessionPreview
 import dev.wadackel.limenty.ui.settings.KeyBarSettingsScreen
 import dev.wadackel.limenty.ui.settings.SettingsScreen
 import dev.wadackel.limenty.ui.settings.SettingsSection
+import dev.wadackel.limenty.ui.settings.ThemeEditorScreen
 import dev.wadackel.limenty.ui.terminal.HostKeyOverlay
 import dev.wadackel.limenty.ui.terminal.TerminalScreen
 import dev.wadackel.limenty.ui.theme.LimentyMotion
@@ -70,6 +71,7 @@ internal val DestinationSaver: Saver<Destination, String> = Saver(
             is Destination.Hosts -> "hosts"
             is Destination.Settings -> destination.section?.let { "settings:${it.name}" } ?: "settings"
             is Destination.KeyBar -> "keybar"
+            is Destination.ThemeEditor -> "theme:${destination.themeId}"
             is Destination.HostForm ->
                 destination.discovered
                     // The name goes last because a Bonjour name may itself contain the separator.
@@ -86,6 +88,7 @@ internal val DestinationSaver: Saver<Destination, String> = Saver(
                 Destination.Settings(SettingsSection.entries.firstOrNull { it.name == name })
             }
             encoded == "keybar" -> Destination.KeyBar
+            encoded.startsWith("theme:") -> Destination.ThemeEditor(encoded.removePrefix("theme:"))
             encoded.startsWith("found:") -> {
                 val (port, address, name) = encoded.removePrefix("found:").split(":", limit = 3)
                 Destination.HostForm(null, LanService(name = name, address = address, port = port.toInt()))
@@ -119,6 +122,9 @@ internal sealed interface Destination {
 
     /** Reached from the keyboard section of settings, and returns there rather than to the host list. */
     data object KeyBar : Destination
+
+    /** A custom theme being edited, reached from the appearance section and returning there. */
+    data class ThemeEditor(val themeId: String) : Destination
 }
 
 /**
@@ -133,7 +139,7 @@ internal val Destination.depth: Int
     get() = when (this) {
         is Destination.Hosts -> 0
         is Destination.Terminal, is Destination.HostForm, is Destination.Settings -> 1
-        is Destination.KeyBar -> 2
+        is Destination.KeyBar, is Destination.ThemeEditor -> 2
     }
 
 /** Whether arriving here from [previous] is a step further in, which is the direction to slide. */
@@ -152,6 +158,7 @@ internal fun Destination.isScreenOf(other: Destination): Boolean = this is Desti
 internal val Destination.backTarget: Destination
     get() = when (this) {
         is Destination.KeyBar -> Destination.Settings(SettingsSection.Keyboard)
+        is Destination.ThemeEditor -> Destination.Settings(SettingsSection.Appearance)
         else -> Destination.Hosts
     }
 
@@ -314,7 +321,8 @@ fun LimentyApp(container: AppContainer, modifier: Modifier = Modifier) {
     BackHandler(
         enabled = destination is Destination.Settings ||
             destination is Destination.HostForm ||
-            destination is Destination.KeyBar,
+            destination is Destination.KeyBar ||
+            destination is Destination.ThemeEditor,
     ) {
         destination = destination.backTarget
     }
@@ -473,6 +481,9 @@ fun LimentyApp(container: AppContainer, modifier: Modifier = Modifier) {
                     onDrag = { transform -> container.settings.updateWithoutWriting(transform) },
                     onBack = { destination = Destination.Hosts },
                     onOpenKeyBar = { destination = Destination.KeyBar },
+                    onEditTheme = { id ->
+                        if (destination is Destination.Settings) destination = Destination.ThemeEditor(id)
+                    },
                     version = BuildConfig.VERSION_NAME,
                     about = {
                         // Read off the main thread, and only once About is shown: the definitions
@@ -504,6 +515,17 @@ fun LimentyApp(container: AppContainer, modifier: Modifier = Modifier) {
                     preferences = settings,
                     onChange = container.settings::update,
                     onBack = { destination = Destination.KeyBar.backTarget },
+                )
+            is Destination.ThemeEditor ->
+                ThemeEditorScreen(
+                    preferences = settings,
+                    themeId = current.themeId,
+                    typefaces = container.typefaces,
+                    onChange = container.settings::update,
+                    onDrag = container.settings::updateWithoutWriting,
+                    onSettled = { container.settings.flush() },
+                    // Only while the editor is still where the app is, like settings' own rows.
+                    onBack = { if (destination == current) destination = current.backTarget },
                 )
             is Destination.Terminal -> {
                 val session = container.connections.session(current.sessionId)

@@ -11,8 +11,9 @@ the obvious alternative was not.
   chrome around a dark terminal would disagree with it.
 - **Fixed, not derived from the terminal theme.** Switching the terminal theme should change the
   terminal and nothing else, or it stops being clear what changed.
-- **Darker than every terminal background.** `Bg` (`#0C0C0F`) is below `#1A1B26`, the darkest theme
-  shipped, so the terminal reads as the front of the app.
+- **Darker than every preset's background.** `Bg` (`#0C0C0F`) is below `#1A1B26`, the darkest theme
+  shipped, so the terminal reads as the front of the app. A custom theme may be lighter, or darker
+  than the chrome; the chrome keeps its colours either way.
 - **One accent**, the violet of the launcher mark (`#A99BEA`).
 
 ## Depth by lightness

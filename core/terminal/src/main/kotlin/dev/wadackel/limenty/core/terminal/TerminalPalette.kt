@@ -7,8 +7,8 @@ package dev.wadackel.limenty.core.terminal
  * Colours are plain ARGB ints so this stays in the pure-JVM module and can be unit-tested; the
  * Android layer converts to `Color` at draw time.
  *
- * Themes are a preset choice with no per-component editing, so a palette is a value
- * rather than a mutable settings object.
+ * A value rather than a mutable settings object: editing a custom theme makes a new palette, so
+ * whoever holds the old one can tell by equality that the colours changed.
  */
 data class TerminalPalette(
     val name: String,

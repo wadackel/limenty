@@ -101,4 +101,18 @@ class DestinationTest {
     fun `the key bar comes back as the key bar after the activity is recreated`() {
         assertEquals(Destination.KeyBar, roundTrip(Destination.KeyBar))
     }
+
+    @Test
+    fun `a theme being edited comes back as that theme after the activity is recreated`() {
+        assertEquals(Destination.ThemeEditor("custom:a"), roundTrip(Destination.ThemeEditor("custom:a")))
+    }
+
+    @Test
+    fun `opening the theme editor steps in and back returns to appearance`() {
+        val editor = Destination.ThemeEditor("custom:a")
+
+        assertTrue(editor.stepsInFrom(Destination.Settings(SettingsSection.Appearance)))
+        assertFalse(Destination.Settings(SettingsSection.Appearance).stepsInFrom(editor))
+        assertEquals(Destination.Settings(SettingsSection.Appearance), editor.backTarget)
+    }
 }

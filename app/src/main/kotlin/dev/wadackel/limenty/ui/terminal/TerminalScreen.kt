@@ -141,7 +141,9 @@ fun TerminalScreen(
         terminalView?.doubleTapDragZoom = preferences.doubleTapDragZoom
     }
 
-    LaunchedEffect(preferences.typography, preferences.paletteName, terminalView) {
+    // Keyed on the palette's colours rather than its id: editing a custom theme changes the colours
+    // and keeps the id, and the open session has to repaint as each one changes.
+    LaunchedEffect(preferences.typography, preferences.palette, terminalView) {
         terminalView?.let { view ->
             view.palette = preferences.palette
             val font = TerminalFont.byId(preferences.typography.fontId)
