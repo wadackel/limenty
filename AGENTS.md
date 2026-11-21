@@ -189,6 +189,13 @@ owner's time twice — once on the wrong answer and once undoing it.
   matches `wm size`, because the default choice is unstable and has returned the powered-off cover
   screen.
 
+## Ship a finished change as a pull request
+
+A finished change goes on its own branch from `main`, into a pull request, and is watched until
+CI passes: read `gh pr checks <number>` after the last push, not a local test run. Merging is left
+to the owner, except in an unattended run, where the work is finished merge included (see "Check on
+the phone when the owner can lend it" above).
+
 ## Repository conventions
 
 - The `:core:*` modules are plain JVM libraries and must stay that way — see
