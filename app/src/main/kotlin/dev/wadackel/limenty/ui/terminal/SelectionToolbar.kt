@@ -27,7 +27,9 @@ import dev.wadackel.limenty.ui.theme.LimentyShapes
  * It floats over the session rather than sitting in the chrome, so it keeps a shadow where the rest
  * of the chrome has none: the terminal behind it can be any colour a theme makes it, and a bar told
  * apart by lightness alone sinks into some of them. Its corner is a key's rather than an
- * overlay's, since it is a row of buttons rather than a pane.
+ * overlay's, since it is a row of buttons rather than a pane. Its words are white like the key bar's
+ * rather than the accent: they are keys over the terminal as the bar's are, and in the accent, right
+ * beside the selection, they read as weightier than the plain actions they are, and harder to read.
  *
  * [anchor] is the selection in the terminal view's pixels; the caller places this in a box that
  * covers exactly that view, and the bar sits wherever [SelectionGeometry.toolbarPosition] puts it.
@@ -58,9 +60,9 @@ fun SelectionToolbar(anchor: SelectionBounds, onOpen: (() -> Unit)?, onCopy: () 
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         if (onOpen != null) {
-            LimentyTextButton("Open", onOpen)
+            LimentyTextButton("Open", onOpen, color = LimentyColors.Text)
         }
-        LimentyTextButton("Copy", onCopy)
-        LimentyTextButton("Paste", onPaste)
+        LimentyTextButton("Copy", onCopy, color = LimentyColors.Text)
+        LimentyTextButton("Paste", onPaste, color = LimentyColors.Text)
     }
 }

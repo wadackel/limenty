@@ -38,7 +38,7 @@ each state. Lightness carries the same information with one rule.
 
 | Role | Value | Used for |
 |---|---|---|
-| `Text` | `#EAE9EE` | labels, names, values being edited |
+| `Text` | `#EAE9EE` | labels, names, values being edited, a key over the terminal (a scrolling key on the key bar, the selection toolbar's actions) |
 | `Text2` | `#ADABB4` | current values, descriptions, addresses |
 | `Text3` | `#807F88` | the quietest text: an unset value (`None`), a tail domain, a note |
 
@@ -52,7 +52,7 @@ text takes one of these; there were eleven sizes before, and none of them read a
 
 | Role | Value | Used for |
 |---|---|---|
-| `Accent` | `#A99BEA` | anything that can be pressed or is selected, section headings, the one filled button |
+| `Accent` | `#A99BEA` | anything that can be pressed or is selected, section headings, the one filled button; not a key over the terminal |
 | `OnAccent` | `#1E1838` | text on an accent fill |
 | `AccentSelection` | accent at 18% | the background of the selected item in a list, behind accent text |
 | `Ok` / `OkSurface` | `#73C786` / `#122D19` | a live session: the dot and the `Connected` chip; a key bar that fits |
