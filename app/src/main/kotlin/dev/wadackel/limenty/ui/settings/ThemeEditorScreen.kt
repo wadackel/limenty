@@ -118,6 +118,10 @@ fun ThemeEditorScreen(
             .windowInsetsPadding(WindowInsets.safeDrawing),
     ) {
         val wide = isWideSettings(maxWidth)
+        // The cover display held sideways is wide enough for two columns at 751dp, but a fixed
+        // 400dp panel left the sample under 300dp and cut its lines off; both give way there.
+        val panelWidth = (maxWidth * 0.48f).coerceIn(MIN_PANEL_WIDTH, MAX_PANEL_WIDTH)
+        val sampleSize = if (maxWidth < ROOMY_WIDTH) 12.sp else 14.sp
         val margin = if (wide) LimentySpacing.ScreenMarginWide else LimentySpacing.ScreenMargin
         val controls: @Composable () -> Unit = {
             ColorRows(palette, selected, changed, onPick = { selected = it }, modifier = Modifier.padding(horizontal = margin))
@@ -138,10 +142,10 @@ fun ThemeEditorScreen(
                     modifier = Modifier.weight(1f).padding(start = margin, end = margin, bottom = margin),
                     horizontalArrangement = Arrangement.spacedBy(20.dp),
                 ) {
-                    ThemeSample(palette, selected, mono, 14.sp, onPick = { selected = it }, modifier = Modifier.weight(1f).fillMaxHeight())
+                    ThemeSample(palette, selected, mono, sampleSize, onPick = { selected = it }, modifier = Modifier.weight(1f).fillMaxHeight())
                     Column(
                         modifier = Modifier
-                            .width(WIDE_PANEL_WIDTH)
+                            .width(panelWidth)
                             .fillMaxHeight()
                             .clip(LimentyShapes.Floating)
                             .background(LimentyColors.Surface)
@@ -287,7 +291,7 @@ private val SAMPLE = listOf(
             Span(ThemeColor.Blue, "nvim/"),
             Span(ThemeColor.Foreground, "  "),
             Span(ThemeColor.Green, "install.sh*"),
-            Span(ThemeColor.Foreground, "  zshrc  "),
+            Span(ThemeColor.Foreground, "  "),
             Span(ThemeColor.Cyan, ".config@"),
         ),
     ),
@@ -538,4 +542,6 @@ private val PaletteSaver = Saver<TerminalPalette, List<Any>>(
 private const val ROW_LENGTH = 8
 private const val TRACK_STOPS = 12
 private val SLIDER_HEIGHT = 28.dp
-private val WIDE_PANEL_WIDTH = 400.dp
+private val MIN_PANEL_WIDTH = 340.dp
+private val MAX_PANEL_WIDTH = 400.dp
+private val ROOMY_WIDTH = 900.dp
