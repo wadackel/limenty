@@ -1,0 +1,110 @@
+#!/usr/bin/env bash
+# Emulator lifecycle helper for the foldable AVD, where fold and resize behaviour is checked.
+set -euo pipefail
+
+. "$(dirname "$0")/lib/adb.sh"
+
+AVD="${LIMENTY_AVD:-limenty_fold}"
+DEVICE_PROFILE="${LIMENTY_AVD_DEVICE:-7.6in Foldable}"
+SYSTEM_IMAGE="${LIMENTY_AVD_IMAGE:-system-images;android-36;google_apis;arm64-v8a}"
+EMULATOR="$ANDROID_HOME/emulator/emulator"
+AVD_CONFIG="$HOME/.android/avd/$AVD.avd/config.ini"
+LOG_DIR="${LIMENTY_LOG_DIR:-$HOME/.cache/limenty}"
+mkdir -p "$LOG_DIR"
+
+# By the AVD argument alone: the process may be the emulator wrapper or the qemu binary it
+# execs, from whichever SDK copy started it, so the program name in front cannot be relied on.
+AVD_PATTERN="-avd $AVD( |$)"
+is_running() { pgrep -f -- "$AVD_PATTERN" >/dev/null 2>&1; }
+
+# The phone is usually attached too, and bare adb refuses outright when more than one device is.
+# Matched by AVD name rather than taking the first emulator, which may be another AVD: `stop`
+# would then kill that one. The console answers the name even while the emulator is offline.
+emu_serial() {
+  case "${ANDROID_SERIAL:-}" in emulator-*) echo "$ANDROID_SERIAL"; return ;; esac
+  local serial
+  for serial in $("$ADB" devices | awk '$1 ~ /^emulator-/ {print $1}'); do
+    if [ "$("$ADB" -s "$serial" emu avd name 2>/dev/null | head -1 | tr -d '\r')" = "$AVD" ]; then
+      echo "$serial"; return
+    fi
+  done
+}
+adb_() {
+  local serial
+  serial=$(emu_serial)
+  [ -n "$serial" ] || { echo "tools/emu: no emulator attached (tools/emu start)" >&2; return 2; }
+  "$ADB" -s "$serial" "$@"
+}
+
+create_avd() {
+  [ -f "$AVD_CONFIG" ] && { echo "avd $AVD already exists"; return 0; }
+  echo no | avdmanager create avd -n "$AVD" -k "$SYSTEM_IMAGE" -d "$DEVICE_PROFILE" >/dev/null
+  # A physical keyboard is a first-class input path; without this the emulator routes
+  # host key events into its own soft keyboard instead of delivering them to the app.
+  python3 - "$AVD_CONFIG" <<'PY'
+import sys, collections
+path = sys.argv[1]
+values = collections.OrderedDict()
+for line in open(path).read().splitlines():
+    if "=" in line and not line.startswith("#"):
+        key, value = line.split("=", 1)
+        values[key] = value
+    else:
+        values[line] = None
+values["hw.keyboard"] = "yes"
+values["hw.ramSize"] = "4096"
+values["vm.heapSize"] = "512"
+values["disk.dataPartition.size"] = "6G"
+open(path, "w").write("\n".join(k if v is None else f"{k}={v}" for k, v in values.items()) + "\n")
+PY
+  echo "created $AVD ($DEVICE_PROFILE)"
+}
+
+wait_boot() {
+  local deadline=$((SECONDS + ${1:-300}))
+  while [ $SECONDS -lt $deadline ]; do
+    if [ "$(adb_ shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ]; then
+      adb_ shell input keyevent KEYCODE_WAKEUP >/dev/null 2>&1 || true
+      adb_ shell wm dismiss-keyguard >/dev/null 2>&1 || true
+      echo "booted"
+      return 0
+    fi
+    sleep 5
+  done
+  echo "timed out waiting for boot" >&2
+  return 1
+}
+
+adb_settle
+case "${1:-}" in
+  create) create_avd ;;
+  start)
+    create_avd
+    if is_running; then echo "already running"; else
+      nohup "$EMULATOR" -avd "$AVD" -no-snapshot-save -no-boot-anim -gpu host -no-audio \
+        >"$LOG_DIR/emulator.log" 2>&1 &
+      echo "started, log: $LOG_DIR/emulator.log"
+    fi
+    wait_boot "${2:-300}"
+    ;;
+  stop)   adb_ emu kill >/dev/null 2>&1 || true; pkill -f -- "$AVD_PATTERN" 2>/dev/null || true; echo stopped ;;
+  wait)   wait_boot "${2:-300}" ;;
+  # The hinge sensor is what the foldable profile actually exposes; `posture` is not available
+  # on every emulator build, so the angle is driven directly.
+  fold)   adb_ emu sensor set hinge-angle0 0 ;;
+  unfold) adb_ emu sensor set hinge-angle0 180 ;;
+  rotate)
+    adb_ shell settings put system accelerometer_rotation 0
+    adb_ shell settings put system user_rotation "${2:-1}"
+    ;;
+  rotate-auto)
+    adb_ shell settings put system accelerometer_rotation 1
+    echo "auto-rotation restored"
+    ;;
+  size)  adb_ shell wm size; adb_ shell wm density ;;
+  shot)  out="${2:-$LOG_DIR/shot.png}"; adb_ exec-out screencap -p > "$out"; echo "$out" ;;
+  *)
+    echo "usage: tools/emu {create|start|stop|wait|fold|unfold|rotate [0-3]|rotate-auto|size|shot [path]}" >&2
+    exit 2
+    ;;
+esac

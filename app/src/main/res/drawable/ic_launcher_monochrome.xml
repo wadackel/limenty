@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The themed-icon face of the mark. Geometry is `ic_launcher_foreground.xml`, which is where the
+  construction and its measurements are written down; only the colours differ, since a themed icon
+  is tinted by the launcher and has one colour to spend. The lower arm steps back to half opacity
+  and the overlap returns to full, which keeps the three tones of the full-colour mark as three
+  levels of one colour.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#000000"
+        android:fillAlpha="0.5"
+        android:pathData="M49.75,75.22 L67.95,58.83 A6.5,6.5 0 0 0 59.25,49.17 L41.05,65.56 A6.5,6.5 0 0 0 49.75,75.22 Z" />
+    <path
+        android:fillColor="#000000"
+        android:pathData="M41.05,42.44 L59.25,58.83 A6.5,6.5 0 0 0 67.95,49.17 L49.75,32.78 A6.5,6.5 0 0 0 41.05,42.44 Z" />
+</vector>

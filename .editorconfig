@@ -1,0 +1,13 @@
+root = true
+
+[*.{kt,kts}]
+# ktlint defaults to `ktlint_official`, a stricter style than this codebase was written to — it
+# reports over two thousand deviations, almost all of them wrapping rules that exist only in that
+# style. `intellij_idea` is the style the code already follows.
+ktlint_code_style = intellij_idea
+# Every Composable is a noun and is named like one, which is the convention Compose itself uses.
+ktlint_function_naming_ignore_when_annotated_with = Composable
+# A `when` that dispatches on a mode number or an escape byte is a lookup table, and a blank line
+# between every entry doubles its height for nothing. This turns off the line break the rule would
+# otherwise insert, which is a style choice rather than a rule being disabled.
+ij_kotlin_line_break_after_multiline_when_entry = false

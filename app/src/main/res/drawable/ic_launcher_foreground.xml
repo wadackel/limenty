@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The Limenty mark: two rounded arms that meet in a prompt chevron, lit where they overlap.
+
+  Each arm is a capsule 13 wide whose centre line runs 24.5 from its end to the vertex at
+  (63.60, 54), opened 42 degrees from the horizontal. The vertex sits half the arm run right of
+  centre so the ink, 31.2 x 45.8, is centred on the canvas; its furthest point is 25.0 from the
+  centre, well inside the 66dp safe circle.
+
+  The overlap is drawn as the lower arm clipped to the upper one rather than as a third shape, so
+  it can never drift off the intersection when the arms are retuned. Its two tints are the accent
+  mixed 45% into the tile and 70% into white; they are written out because the themed and
+  notification faces cannot carry them and the header mark repeats them.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#67608E"
+        android:pathData="M49.75,75.22 L67.95,58.83 A6.5,6.5 0 0 0 59.25,49.17 L41.05,65.56 A6.5,6.5 0 0 0 49.75,75.22 Z" />
+    <path
+        android:fillColor="#A99BEA"
+        android:pathData="M41.05,42.44 L59.25,58.83 A6.5,6.5 0 0 0 67.95,49.17 L49.75,32.78 A6.5,6.5 0 0 0 41.05,42.44 Z" />
+    <group>
+        <clip-path android:pathData="M41.05,42.44 L59.25,58.83 A6.5,6.5 0 0 0 67.95,49.17 L49.75,32.78 A6.5,6.5 0 0 0 41.05,42.44 Z" />
+        <path
+            android:fillColor="#E5E1F9"
+            android:pathData="M49.75,75.22 L67.95,58.83 A6.5,6.5 0 0 0 59.25,49.17 L41.05,65.56 A6.5,6.5 0 0 0 49.75,75.22 Z" />
+    </group>
+</vector>

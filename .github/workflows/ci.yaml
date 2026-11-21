@@ -1,0 +1,81 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# A push that lands while the previous one is still building makes the older answer irrelevant.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7.0.1
+      # JDK 17 and ktlint come from the flake, so CI runs the versions the devshell pins rather
+      # than whatever the runner image happens to ship this month.
+      - uses: $/.github/actions/setup-nix
+
+      # Before the Gradle cache, not after: ktlint needs no Gradle, and a formatting slip should
+      # not first pay a minute to restore a cache it will never use.
+      #
+      # `./gw` is deliberately not used anywhere here: it is `nix develop --command ./gradlew`,
+      # and every step is already inside the devshell.
+      - name: Lint (ktlint)
+        run: nix develop -c ktlint
+
+      # Caches the Gradle distribution and the dependency set, which is most of a cold run. It
+      # also verifies the committed `gradle-wrapper.jar` against Gradle's published checksums,
+      # which is worth having for a jar that lives in the repository.
+      #
+      # Read-only off main: a pull request reads the cache but does not write one back, which
+      # skips a post-job upload that can cost more than the run it followed.
+      #
+      # Gradle's configuration cache is on in gradle.properties but does not survive between runs
+      # here — this action only stores it when given an encryption key, since it can hold secrets.
+      # Each run reconfigures. That costs seconds, and is worth knowing before someone spends an
+      # afternoon asking why the cache never hits.
+      - uses: gradle/actions/setup-gradle@v6.4.1
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+
+      # The Android SDK comes from the runner image, which sets ANDROID_HOME; the flake's
+      # shellHook takes it rather than overriding it.
+      #
+      # `:app`'s unit tests are excluded from the release variant: `test` would otherwise run the
+      # same 46 tests twice, and the release variant differs only by minification, which a unit
+      # test never reaches.
+      #
+      # The throughput benchmark is left in. It asserts absolute rates on a shared runner, which is
+      # the obvious thing to flake, and `-PskipPerfTests` exists for when it does — but switching
+      # it off before it has failed once would remove the measurement on a guess.
+      - name: Unit tests
+        run: nix develop -c ./gradlew test -x :app:testReleaseUnitTest
+
+      - name: Android Lint
+        run: nix develop -c ./gradlew :app:lintDebug
+
+      # `test` already compiles the app's Kotlin, so this is not here for that. It is here for
+      # everything after compilation — merging resources and the manifest, dexing, packaging —
+      # none of which a unit test touches and any of which can break on its own.
+      - name: Assemble
+        run: nix develop -c ./gradlew :app:assembleDebug
+
+      - name: Reports
+        if: failure()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: reports
+          path: |
+            **/build/reports/
+            **/build/test-results/
+          retention-days: 7
+          if-no-files-found: ignore

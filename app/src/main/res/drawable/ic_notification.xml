@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The mark as a notification's small icon.
+
+  Separate from the launcher icon rather than reusing it, for two reasons that both showed on a
+  phone. A small icon is drawn as a silhouette from its alpha and tinted by the system, so the
+  launcher icon's three tones are a distinction that cannot survive the trip — and where a surface
+  does not tint, they come through and the icon is the only multi-tone one in the shade. And the
+  launcher art is drawn for a 108 canvas of which a mask keeps 72 and a safe circle only 66, so its
+  ink is a third of the box; dropped into the 24dp a notification gives it, that is a third of the
+  size every other app's icon is.
+
+  The arms are `ic_launcher_foreground.xml`'s construction at 13.5 wide instead of 13, the extra
+  half keeping the stroke from thinning out at 24dp, then scaled by 1.7715 so the ink is 82 tall
+  in this 108 viewport and centred. Its furthest point is 45.2 from the centre, inside the circle a
+  launcher crops a badge to.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M29.87,33.84 L62.13,62.89 A11.96,11.96 0 0 0 78.13,45.11 L45.87,16.07 A11.96,11.96 0 0 0 29.87,33.84 Z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M45.87,91.93 L78.13,62.89 A11.96,11.96 0 0 0 62.13,45.11 L29.87,74.16 A11.96,11.96 0 0 0 45.87,91.93 Z" />
+</vector>

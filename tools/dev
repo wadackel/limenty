@@ -1,0 +1,91 @@
+#!/usr/bin/env bash
+# Drives the physical device. Kept separate from tools/app because a foldable exposes several
+# displays and an emulator is usually attached at the same time, so both need naming explicitly.
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+. tools/lib/adb.sh
+adb_settle
+SERIAL="${LIMENTY_DEVICE:-$("$ADB" devices | awk '$2=="device" && $1 !~ /^emulator-/ {print $1; exit}')}"
+PKG=dev.wadackel.limenty.debug
+APK=app/build/outputs/apk/debug/app-debug.apk
+# Fixed rather than the random one Android's own wireless debugging picks, so reconnecting is
+# something you can type instead of something you have to look up on the device first.
+WIFI_PORT=5555
+
+[ -n "$SERIAL" ] || { echo "no physical device attached" >&2; exit 1; }
+adb_() { "$ADB" -s "$SERIAL" "$@"; }
+
+list_displays() { adb_ shell dumpsys SurfaceFlinger --display-id 2>/dev/null | sed -n 's/^Display \([0-9]*\).*/\1/p'; }
+
+# The panel the activity is on: the one whose size matches what the window manager reports.
+main_display() {
+  local size width height
+  size="$(adb_ shell wm size 2>/dev/null | sed -n 's/.*: \([0-9]*\)x\([0-9]*\).*/\1 \2/p' | tail -1)"
+  width="${size% *}"; height="${size#* }"
+  for id in $(list_displays); do
+    if adb_ shell dumpsys SurfaceFlinger --displays 2>/dev/null | grep -q .; then :; fi
+    adb_ shell screencap -d "$id" -p /sdcard/limenty-probe.png >/dev/null 2>&1 || continue
+    local dims
+    dims="$(adb_ shell "toybox file /sdcard/limenty-probe.png 2>/dev/null" | sed -n 's/.*, \([0-9]*\) x \([0-9]*\).*/\1 \2/p')"
+    [ -z "$dims" ] && continue
+    if [ "${dims% *}" = "$width" ] && [ "${dims#* }" = "$height" ]; then
+      adb_ shell rm -f /sdcard/limenty-probe.png
+      echo "$id"; return
+    fi
+  done
+  adb_ shell rm -f /sdcard/limenty-probe.png 2>/dev/null || true
+}
+
+case "${1:-}" in
+  info)   adb_ shell getprop ro.product.model; adb_ shell wm size; adb_ shell wm density ;;
+  run)    ./gw :app:assembleDebug && adb_ install -r "$APK" && adb_ logcat -c \
+            && adb_ shell am start -n "$PKG/dev.wadackel.limenty.MainActivity" ;;
+  debug)  adb_ shell am start -n "$PKG/dev.wadackel.limenty.debugharness.DebugActivity" ;;
+  # A foldable exposes both panels, and screencap's choice of "first display" is explicitly not
+  # stable — it silently returned the powered-off cover panel. The display is therefore named,
+  # and the capture goes through a file because the multiple-displays warning is written to the
+  # same stdout a streamed PNG would use.
+  shot)   out="${2:-./artifacts/device.png}"; mkdir -p "$(dirname "$out")"
+          display="$(main_display)"
+          adb_ shell screencap ${display:+-d "$display"} -p /sdcard/limenty-shot.png 2>/dev/null
+          adb_ pull /sdcard/limenty-shot.png "$out" >/dev/null
+          adb_ shell rm -f /sdcard/limenty-shot.png
+          echo "$out" ;;
+  displays) list_displays ;;
+  log)    adb_ logcat -d | grep -E 'Limenty\.[A-Za-z]+:' || true ;;
+  logf)   adb_ logcat | grep --line-buffered -E 'Limenty\.[A-Za-z]+:' ;;
+  crash)  adb_ logcat -d -b crash | tail -60 ;;
+  dump)   dest="${2:-./artifacts/diagnostics}"; mkdir -p "$dest"
+          for f in $(adb_ shell run-as "$PKG" ls files/diagnostics 2>/dev/null | tr -d '\r'); do
+            adb_ shell run-as "$PKG" cat "files/diagnostics/$f" > "$dest/$f"; echo "$dest/$f"
+          done ;;
+  fold)   adb_ shell dumpsys sensorservice | grep -i hinge | head -3 ;;
+  # Put the device on the network so the cable can come out. Android's own wireless debugging
+  # only starts its listener when the device is on Wi-Fi — with the toggle on but no Wi-Fi it
+  # binds to loopback and nothing else, which looks identical to it working until you try to
+  # reach it. This arms the plain TCP listener instead, which binds everywhere and so is
+  # reachable over the tailnet the phone is already on.
+  #
+  # Needs a working connection to arm, so after the device reboots this wants the cable once
+  # more. The address is read off the device rather than remembered, since only the tailnet one
+  # is stable and even that is worth confirming.
+  wifi)   case "$SERIAL" in
+            # A port means the TCP listener; the mDNS name is Android's own wireless debugging,
+            # and arming tcpip over it would restart the adbd that connection rides on.
+            *:*|*._adb-tls-connect._tcp) echo "already wireless: $SERIAL"; exit 0 ;;
+          esac
+          addr=$(adb_ shell ip -o -f inet addr 2>/dev/null \
+                 | awk '$2!="lo" {split($4,a,"/"); print $2, a[1]}' | tr -d '\r')
+          # Wi-Fi first when there is any, since a local link beats a relayed one; the tailnet
+          # address otherwise, which is what a phone on mobile data has.
+          host=$(echo "$addr" | awk '$1 ~ /^wlan/ {print $2; exit}')
+          [ -n "$host" ] || host=$(echo "$addr" | awk '$1 ~ /^tun/ {print $2; exit}')
+          [ -n "$host" ] || { echo "tools/dev wifi: the device has no address to reach it on" >&2
+                              echo "$addr" >&2; exit 1; }
+          adb_ tcpip "$WIFI_PORT" >/dev/null
+          sleep 3
+          "$ADB" connect "$host:$WIFI_PORT"
+          echo "unplug the cable; commands follow LIMENTY_DEVICE=$host:$WIFI_PORT" ;;
+  *)      echo "usage: tools/dev {info|run|debug|shot [path]|displays|log|logf|crash|dump [dir]|fold|wifi}" >&2; exit 2 ;;
+esac
