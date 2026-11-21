@@ -255,12 +255,7 @@ private fun SettingsContent.TwoPane(selected: SettingsSection, onSelect: (Settin
     }
 }
 
-/**
- * One section's page, with [header] above it.
- *
- * Appearance keeps its preview pinned with the header: the sliders and pickers below it are what
- * change it, and a preview scrolled out of sight while they are being moved shows nothing.
- */
+/** One section's page, with [header] above it. */
 @Composable
 private fun SettingsContent.Page(
     page: SettingsSection,
@@ -268,39 +263,35 @@ private fun SettingsContent.Page(
     themeColumns: Int,
     gesturesSideBySide: Boolean,
 ) {
-    val pinned = page == SettingsSection.Appearance
-    Column(modifier = Modifier.fillMaxSize()) {
-        if (pinned) {
-            header()
-            MetricsSample(
-                preferences,
-                typefaces,
-                modifier = Modifier.padding(horizontal = LocalSettingsFrame.current.margin).padding(bottom = 6.dp),
+    Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+        header()
+        when (page) {
+            SettingsSection.Appearance -> AppearanceBody(themeColumns)
+            SettingsSection.Keyboard -> KeyboardBody()
+            SettingsSection.Gestures -> GestureSettings(
+                bindings = preferences.gestures,
+                onChange = { bindings -> onChange { it.copy(gestures = bindings) } },
+                doubleTapDragZoom = preferences.doubleTapDragZoom,
+                onDoubleTapDragZoomChange = { enabled -> onChange { it.copy(doubleTapDragZoom = enabled) } },
+                sideBySide = gesturesSideBySide,
             )
+            SettingsSection.Screen -> SettingsGroup(modifier = Modifier.padding(top = 8.dp)) { KeepAwakeRow() }
+            SettingsSection.About -> about()
         }
-        Column(modifier = Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState())) {
-            if (!pinned) header()
-            when (page) {
-                SettingsSection.Appearance -> AppearanceBody(themeColumns)
-                SettingsSection.Keyboard -> KeyboardBody()
-                SettingsSection.Gestures -> GestureSettings(
-                    bindings = preferences.gestures,
-                    onChange = { bindings -> onChange { it.copy(gestures = bindings) } },
-                    doubleTapDragZoom = preferences.doubleTapDragZoom,
-                    onDoubleTapDragZoomChange = { enabled -> onChange { it.copy(doubleTapDragZoom = enabled) } },
-                    sideBySide = gesturesSideBySide,
-                )
-                SettingsSection.Screen -> SettingsGroup(modifier = Modifier.padding(top = 8.dp)) { KeepAwakeRow() }
-                SettingsSection.About -> about()
-            }
-            Spacer(Modifier.height(24.dp))
-        }
+        Spacer(Modifier.height(24.dp))
     }
 }
 
 @Composable
 private fun SettingsContent.AppearanceBody(themeColumns: Int) {
     val font = TerminalFont.byId(preferences.typography.fontId)
+    // Scrolls with the page rather than staying under the title: pinned, it shrank the scrolling
+    // area enough to make the pickers and sliders below it hard to work.
+    MetricsSample(
+        preferences,
+        typefaces,
+        modifier = Modifier.padding(horizontal = LocalSettingsFrame.current.margin).padding(bottom = 6.dp),
+    )
     SettingsHeading("Theme", preferences.palette.name)
     ThemeGrid(
         selected = preferences.palette.name,
