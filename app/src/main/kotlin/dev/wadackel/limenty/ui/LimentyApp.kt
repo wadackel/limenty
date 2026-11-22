@@ -44,6 +44,7 @@ import dev.wadackel.limenty.data.LanService
 import dev.wadackel.limenty.data.SaveOutcome
 import dev.wadackel.limenty.data.loadAboutContent
 import dev.wadackel.limenty.data.notSaved
+import dev.wadackel.limenty.data.sharingTrustedKeyWith
 import dev.wadackel.limenty.log.AppLogging
 import dev.wadackel.limenty.service.SessionKeepAliveService
 import dev.wadackel.limenty.ui.about.AboutSection
@@ -391,9 +392,9 @@ fun LimentyApp(container: AppContainer, modifier: Modifier = Modifier) {
                                     .onSuccess {
                                         // The key belongs to the machine rather than the profile, so
                                         // it stays while another profile — another user on the same
-                                        // host, say — still connects there.
+                                        // host, say — still connects there. The delete dialog says so.
                                         val stillReached = container.hosts.hosts.value.orEmpty()
-                                            .any { it.hostname == host.hostname && it.port == host.port }
+                                            .sharingTrustedKeyWith(host).isNotEmpty()
                                         if (stillReached) return@onSuccess
                                         container.knownHosts.forget(host.hostname, host.port).onFailure {
                                             container.report(
