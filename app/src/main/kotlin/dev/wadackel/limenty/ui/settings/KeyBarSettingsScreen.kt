@@ -102,6 +102,7 @@ fun KeyBarSettingsScreen(
     var deleting by remember { mutableStateOf(false) }
 
     var editing by remember { mutableStateOf<KeySlot?>(null) }
+    var removing by remember { mutableStateOf<KeySlot?>(null) }
     var adding by remember { mutableStateOf(false) }
     // Per set: a drag state keeps the slots it measured by position, and the next set's keys are
     // somewhere else.
@@ -245,11 +246,31 @@ fun KeyBarSettingsScreen(
                     editing = null
                 },
                 onRemove = {
-                    onRowChange(withoutKey)
                     editing = null
+                    removing = slot
                 },
             ),
         )
+    }
+
+    removing?.let { slot ->
+        val row = if (slot.pinned) pinned else scrolling
+        val onRowChange = if (slot.pinned) onPinnedChange else onScrollingChange
+        val key = row.getOrNull(slot.index) ?: return@let
+        LimentyDialog(title = "Remove key", onDismissRequest = { removing = null }) {
+            Text("${key.label.ifBlank { key.spoken() }} will be removed.", style = LimentyText.Body, color = LimentyColors.Text2)
+            LimentyDialogActions {
+                LimentyTextButton("Cancel", { removing = null }, color = LimentyColors.Text2)
+                LimentyTextButton(
+                    label = "Remove",
+                    onClick = {
+                        onRowChange(row.filterIndexed { at, _ -> at != slot.index })
+                        removing = null
+                    },
+                    color = LimentyColors.Danger,
+                )
+            }
+        }
     }
 
     if (adding) {
