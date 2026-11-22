@@ -48,12 +48,11 @@ object LimentyColors {
     /** Text and glyphs on an accent fill. */
     val OnAccent = Color(0xFF1E1838)
 
-    /** The selected item in a list: the accent at 18%, behind accent text. */
+    /** The selected item in a list: the accent at 18%. */
     val AccentSelection = Color(0x2EA99BEA)
 
     /** A live session. */
     val Ok = Color(0xFF73C786)
-    val OkSurface = Color(0xFF122D19)
 
     /** Something to read before going on: a changed host key, a key bar too tight to scroll. */
     val Warn = Color(0xFFECC16B)

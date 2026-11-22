@@ -38,6 +38,8 @@ import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -54,6 +56,7 @@ import dev.wadackel.limenty.data.HostProfile
 import dev.wadackel.limenty.data.shortHostName
 import dev.wadackel.limenty.ui.components.LimentyChevron
 import dev.wadackel.limenty.ui.components.LimentyIconButton
+import dev.wadackel.limenty.ui.components.LimentyTextButtonInset
 import dev.wadackel.limenty.ui.components.overhangVertically
 import dev.wadackel.limenty.ui.theme.LimentyColors
 import dev.wadackel.limenty.ui.theme.LimentyShapes
@@ -143,8 +146,10 @@ private const val UPTIME_INTERVAL_MILLIS = 30_000L
  * preview and the resume line simply absent when there is no session. Nothing branches on how
  * many hosts there are, so a list of one and a list of six are laid out the same way.
  *
- * A host without a session has no status mark: the connected card is a step lighter and carries
- * a `Connected` chip, so an empty ring on every other card would only repeat that absence.
+ * A live session is a dot before the name, the mark the unfolded display's list uses. A chip at
+ * the end of the name row sat against `···` and read as part of the menu, and a lighter card for
+ * a connected host said again what the preview already shows. A host without a session has no
+ * mark: an empty ring on every other card would only repeat that absence.
  */
 @Composable
 fun HostRow(
@@ -163,7 +168,7 @@ fun HostRow(
         modifier = modifier
             .fillMaxWidth()
             .clip(LimentyShapes.Surface)
-            .background(if (connected) LimentyColors.Surface3 else LimentyColors.Surface)
+            .background(LimentyColors.Surface)
             // The whole card opens the host — `Resume` is a signal inside it, not a separate button.
             .clickable(onClick = onOpen)
             .padding(LimentySpacing.SurfacePadding),
@@ -173,6 +178,7 @@ fun HostRow(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            if (connected) StatusDot(connected = true)
             Text(
                 text = host.displayName,
                 style = LimentyText.Heading,
@@ -180,7 +186,6 @@ fun HostRow(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
-            if (connected) ConnectedChip()
             LimentyIconButton(
                 contentDescription = "More for ${host.displayName}",
                 onClick = onMenu,
@@ -245,11 +250,12 @@ internal fun HostListItem(
     ) {
         StatusDot(connected)
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            // In the text colour, unlike the settings index: the same host's card on the cover
+            // display keeps its name white, and the background already says which one is chosen.
             Text(
                 text = host.displayName,
                 style = LimentyText.Body,
                 fontWeight = FontWeight.Medium,
-                color = if (selected) LimentyColors.Accent else LimentyColors.Text,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -292,6 +298,7 @@ internal fun HostDetail(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                if (connected) StatusDot(connected = true)
                 Text(
                     text = host.displayName,
                     style = LimentyText.Title,
@@ -299,7 +306,6 @@ internal fun HostDetail(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f, fill = false),
                 )
-                if (connected) ConnectedChip()
             }
             Row(
                 modifier = Modifier.offset(x = 8.dp),
@@ -338,22 +344,28 @@ internal fun HostDetail(
                     textStyle = DetailPreviewText,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
                 )
+            }
+            // Under the preview, as on the cover display's card, rather than over its corner: a
+            // pill there covered the session it was inviting back into.
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 10.dp).heightIn(min = 24.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(preview.meta, style = LimentyText.MonoMeta, fontFamily = mono)
+                // Pressable on its own: outside the preview, nothing around it opens the session,
+                // unlike the cover display's card, which is pressed as a whole.
                 OpenHint(
                     "Resume",
                     modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(12.dp)
-                        .clip(LimentyShapes.Small)
-                        .background(LimentyColors.Scrim)
-                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                        .offset(x = LimentyTextButtonInset)
+                        .overhangVertically((LimentySpacing.TouchTarget - 24.dp) / 2)
+                        .heightIn(min = LimentySpacing.TouchTarget)
+                        .clip(LimentyShapes.Surface)
+                        .clickable(role = Role.Button, onClick = onOpen)
+                        .padding(horizontal = LimentyTextButtonInset),
                 )
             }
-            Text(
-                preview.meta,
-                style = LimentyText.MonoMeta,
-                fontFamily = mono,
-                modifier = Modifier.padding(top = 10.dp),
-            )
         } else {
             Box(
                 modifier = Modifier
@@ -370,8 +382,8 @@ internal fun HostDetail(
                     color = LimentyColors.Text3,
                     modifier = Modifier.align(Alignment.Center),
                 )
-                // Where the pill sits on a preview, so the words that act are in one place
-                // whichever state the host is in.
+                // Inside the area rather than under it, where Resume sits: the area is what is
+                // pressed, and there is no session here for the word to cover.
                 OpenHint(
                     "Connect",
                     modifier = Modifier
@@ -380,26 +392,6 @@ internal fun HostDetail(
                 )
             }
         }
-    }
-}
-
-@Composable
-private fun ConnectedChip() {
-    Row(
-        modifier = Modifier
-            .clip(LimentyShapes.Small)
-            .background(LimentyColors.OkSurface)
-            .padding(horizontal = 10.dp, vertical = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(
-            modifier = Modifier
-                .size(6.dp)
-                .clip(CircleShape)
-                .background(LimentyColors.Ok),
-        )
-        Text("Connected", style = LimentyText.Secondary, color = LimentyColors.Ok)
     }
 }
 
@@ -421,7 +413,8 @@ private fun StatusDot(connected: Boolean) {
     val dot = Modifier.size(8.dp).clip(CircleShape)
     Box(
         modifier = if (connected) {
-            dot.background(LimentyColors.Ok)
+            // The dot is the only place the word is left, so a screen reader still hears it.
+            dot.background(LimentyColors.Ok).semantics { contentDescription = "Connected" }
         } else {
             dot.border(1.5.dp, LimentyColors.Text3, CircleShape)
         },
@@ -519,7 +512,7 @@ private fun StrokeGlyph(pathData: List<String>, color: Color = LimentyColors.Tex
 private val CardPreviewText = TextStyle(fontSize = 10.sp, lineHeight = 17.5.sp)
 private val DetailPreviewText = TextStyle(fontSize = 12.sp, lineHeight = 20.sp)
 
-/** Seven lines of [DetailPreviewText] and room under them for the hint, which must not cover one. */
+/** The preview and the empty area alike, so choosing another host does not move what is below. */
 private val DETAIL_AREA_HEIGHT = 300.dp
 
 private val GLYPH_SIZE = 20.dp
