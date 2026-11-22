@@ -58,6 +58,7 @@ import androidx.compose.ui.unit.sp
 import dev.wadackel.limenty.core.terminal.TerminalFont
 import dev.wadackel.limenty.core.terminal.TerminalPalette
 import dev.wadackel.limenty.data.TerminalPreferences
+import dev.wadackel.limenty.data.hexDigits
 import dev.wadackel.limenty.data.hexOf
 import dev.wadackel.limenty.data.parseHex
 import dev.wadackel.limenty.terminal.TerminalTypefaces
@@ -465,7 +466,7 @@ private fun ColorControls(
 
 /** Said only once there is enough to be wrong about, not while the first digits are going in. */
 private fun looksMistyped(text: String): Boolean {
-    val digits = text.trim().removePrefix("#")
+    val digits = hexDigits(text)
     if (parseHex(text) != null || digits.isEmpty()) return false
     return digits.length >= 6 || digits.any { it !in '0'..'9' && it.lowercaseChar() !in 'a'..'f' }
 }

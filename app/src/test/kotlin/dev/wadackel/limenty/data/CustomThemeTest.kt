@@ -42,4 +42,10 @@ class CustomThemeTest {
         assertNull(parseHex("#7AA2F"))
         assertNull(parseHex("#7AA2FG"))
     }
+
+    @Test
+    fun `hex typed in full-width by a kana keyboard reads as the same colour`() {
+        assertEquals(0xFF000000.toInt(), parseHex("００００００"))
+        assertEquals(0xFF7AA2F7.toInt(), parseHex("＃７ａａ２ｆ７"))
+    }
 }

@@ -79,7 +79,20 @@ fun hexOf(argb: Int): String = "#%06X".format(argb and 0xFFFFFF)
 
 /** A colour from `#RRGGBB` or `RRGGBB`, or null for anything else. */
 fun parseHex(text: String): Int? {
-    val digits = text.trim().removePrefix("#")
+    val digits = hexDigits(text)
     if (digits.length != 6 || !digits.all { it in '0'..'9' || it.lowercaseChar() in 'a'..'f' }) return null
     return (0xFF shl 24) or digits.toInt(16)
 }
+
+/**
+ * What was typed, without the hash and in half-width form.
+ *
+ * A Japanese keyboard in kana mode types `０００` for 000 whatever the field asks for, and the
+ * value reads the same to the person typing it.
+ */
+fun hexDigits(text: String): String = text.trim()
+    .map { if (it in '\uFF01'..'\uFF5E') it - FULL_WIDTH_OFFSET else it }
+    .joinToString("")
+    .removePrefix("#")
+
+private const val FULL_WIDTH_OFFSET = 0xFEE0
