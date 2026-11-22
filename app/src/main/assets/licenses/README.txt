@@ -3,6 +3,10 @@ Bundled fonts and their licences.
 JetBrains Mono   SIL Open Font License 1.1   JetBrainsMono-OFL.txt
 Fira Code        SIL Open Font License 1.1   FiraCode-OFL.txt
 Hack             MIT + Bitstream Vera        Hack-LICENSE.md
+Source Code Pro  SIL Open Font License 1.1   SourceCodePro-OFL.md
+IBM Plex Mono    SIL Open Font License 1.1   IBMPlexMono-OFL.txt
+Cascadia Mono    SIL Open Font License 1.1   CascadiaMono-OFL.txt
+Inconsolata      SIL Open Font License 1.1   Inconsolata-OFL.txt
 Symbols Nerd Font Mono
                  MIT (Nerd Fonts project)    SymbolsNerdFont-LICENSE.txt
 

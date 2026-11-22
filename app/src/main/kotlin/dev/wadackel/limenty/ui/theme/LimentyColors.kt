@@ -7,8 +7,8 @@ import androidx.compose.ui.graphics.Color
  *
  * Fixed rather than derived from the terminal theme: the terminal's colours changing is meant to be
  * the only signal that a theme was switched, and Solarized Dark is low-contrast by design — a chrome
- * matched to it sinks the other themes. The background sits darker than every terminal background
- * (`#1A1B26` through `#002B36`), so the terminal stays in front whichever theme is showing.
+ * matched to it sinks the other themes. The background sits darker than every preset's background
+ * (the darkest is Night Owl's `#011627`), so the terminal stays in front whichever theme is showing.
  *
  * Depth is told by lightness, not by borders: the nearer a surface, the lighter it is. The greys
  * lean slightly towards the accent's hue (oklch hue 295) so the violet does not sit on them as a

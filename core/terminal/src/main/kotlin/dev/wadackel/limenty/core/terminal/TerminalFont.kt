@@ -38,7 +38,38 @@ data class TerminalFont(
             boldAsset = "fonts/fira_code_bold.ttf",
         )
 
-        val All = listOf(JetBrainsMono, Hack, FiraCode)
+        val SourceCodePro = TerminalFont(
+            id = "source-code-pro",
+            displayName = "Source Code Pro",
+            regularAsset = "fonts/source_code_pro_regular.ttf",
+            boldAsset = "fonts/source_code_pro_bold.ttf",
+        )
+
+        val IbmPlexMono = TerminalFont(
+            id = "ibm-plex-mono",
+            displayName = "IBM Plex Mono",
+            regularAsset = "fonts/ibm_plex_mono_regular.ttf",
+            boldAsset = "fonts/ibm_plex_mono_bold.ttf",
+        )
+
+        /** Mono rather than Code: the two differ only by ligatures, which the cell renderer never shapes. */
+        val CascadiaMono = TerminalFont(
+            id = "cascadia-mono",
+            displayName = "Cascadia Mono",
+            regularAsset = "fonts/cascadia_mono_regular.ttf",
+            boldAsset = "fonts/cascadia_mono_bold.ttf",
+        )
+
+        val Inconsolata = TerminalFont(
+            id = "inconsolata",
+            displayName = "Inconsolata",
+            regularAsset = "fonts/inconsolata_regular.ttf",
+            boldAsset = "fonts/inconsolata_bold.ttf",
+        )
+
+        /** Alphabetical, ignoring case, so the default is not singled out. */
+        val All = listOf(JetBrainsMono, Hack, FiraCode, SourceCodePro, IbmPlexMono, CascadiaMono, Inconsolata)
+            .sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.displayName })
 
         val Default = JetBrainsMono
 

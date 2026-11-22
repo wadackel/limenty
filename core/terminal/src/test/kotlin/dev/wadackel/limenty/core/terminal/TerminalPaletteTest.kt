@@ -24,7 +24,24 @@ class TerminalPaletteTest {
      */
     @Test
     fun everyThemeDefinedIsAlsoOffered() {
-        assertThat(themes).contains(TerminalPalette.Dogrun)
+        assertThat(themes).containsAtLeast(
+            TerminalPalette.Dogrun,
+            TerminalPalette.CatppuccinMocha,
+            TerminalPalette.RosePine,
+            TerminalPalette.KanagawaWave,
+            TerminalPalette.EverforestDark,
+            TerminalPalette.OneDark,
+            TerminalPalette.NightOwl,
+            TerminalPalette.Iceberg,
+        )
+    }
+
+    @Test
+    fun theThemesAreListedAlphabeticallyIgnoringCase() {
+        assertThat(themes.map { it.name }).containsExactly(
+            "Catppuccin Mocha", "dogrun", "Dracula", "Everforest Dark", "Gruvbox Dark", "Iceberg",
+            "Kanagawa Wave", "Night Owl", "Nord", "One Dark", "Rosé Pine", "Solarized Dark", "Tokyo Night",
+        ).inOrder()
     }
 
     @Test
