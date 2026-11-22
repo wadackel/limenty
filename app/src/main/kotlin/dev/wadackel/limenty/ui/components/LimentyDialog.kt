@@ -2,6 +2,7 @@ package dev.wadackel.limenty.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -16,9 +17,15 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -111,5 +118,43 @@ fun LimentyDialogActions(content: @Composable RowScope.() -> Unit) {
     ) {
         Spacer(modifier = Modifier.weight(1f))
         content()
+    }
+}
+
+/**
+ * A row of a menu box: the whole width responds, and it is tall enough to hit without aiming.
+ *
+ * No inset of its own, so the word starts where the title above it does. An inset would buy the
+ * press a margin at the cost of putting every choice a step in from the thing they are choices for.
+ */
+@Composable
+fun LimentyMenuAction(label: String, onClick: () -> Unit, color: Color = LimentyColors.Text) {
+    Text(
+        text = label,
+        style = LimentyText.Body,
+        color = color,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(LimentyShapes.Surface)
+            .clickable(role = Role.Button, onClick = onClick)
+            .padding(vertical = 12.dp),
+    )
+}
+
+/** Asks for a name, for something being renamed or for the copy of something being duplicated. */
+@Composable
+fun LimentyNameDialog(
+    title: String,
+    initial: String,
+    onDismiss: () -> Unit,
+    onSave: (String) -> Unit,
+) {
+    var name by remember { mutableStateOf(initial) }
+    LimentyDialog(title = title, onDismissRequest = onDismiss) {
+        LimentyField(label = "Name", value = name, onValueChange = { name = it })
+        LimentyDialogActions {
+            LimentyTextButton("Cancel", onDismiss, color = LimentyColors.Text2)
+            LimentyTextButton(label = "Save", onClick = { onSave(name.trim()) }, enabled = name.isNotBlank())
+        }
     }
 }

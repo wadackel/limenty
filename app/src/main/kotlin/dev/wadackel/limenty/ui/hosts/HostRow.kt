@@ -54,6 +54,7 @@ import dev.wadackel.limenty.data.HostProfile
 import dev.wadackel.limenty.data.shortHostName
 import dev.wadackel.limenty.ui.components.LimentyChevron
 import dev.wadackel.limenty.ui.components.LimentyIconButton
+import dev.wadackel.limenty.ui.components.overhangVertically
 import dev.wadackel.limenty.ui.theme.LimentyColors
 import dev.wadackel.limenty.ui.theme.LimentyShapes
 import dev.wadackel.limenty.ui.theme.LimentySpacing
@@ -512,15 +513,6 @@ private fun StrokeGlyph(pathData: List<String>, color: Color = LimentyColors.Tex
             val stroke = Stroke(width = GLYPH_STROKE, cap = StrokeCap.Round, join = StrokeJoin.Round)
             paths.forEach { drawPath(it, color, style = stroke) }
         }
-    }
-}
-
-/** Takes [amount] off the top and bottom of what the layout sees, without moving the content. */
-private fun Modifier.overhangVertically(amount: Dp) = layout { measurable, constraints ->
-    val placeable = measurable.measure(constraints)
-    val trim = amount.roundToPx()
-    layout(placeable.width, (placeable.height - 2 * trim).coerceAtLeast(0)) {
-        placeable.place(0, -trim)
     }
 }
 

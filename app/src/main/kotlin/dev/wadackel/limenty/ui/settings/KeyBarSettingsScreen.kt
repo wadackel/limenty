@@ -59,7 +59,7 @@ import dev.wadackel.limenty.data.KeySet
 import dev.wadackel.limenty.data.TerminalPreferences
 import dev.wadackel.limenty.ui.components.LimentyDialog
 import dev.wadackel.limenty.ui.components.LimentyDialogActions
-import dev.wadackel.limenty.ui.components.LimentyField
+import dev.wadackel.limenty.ui.components.LimentyNameDialog
 import dev.wadackel.limenty.ui.components.LimentyTextButton
 import dev.wadackel.limenty.ui.components.LimentyTextButtonInset
 import dev.wadackel.limenty.ui.components.rememberReorderState
@@ -271,7 +271,7 @@ fun KeyBarSettingsScreen(
     }
 
     naming?.let { mode ->
-        SetNameDialog(
+        LimentyNameDialog(
             title = if (mode == SetNaming.Rename) "Rename key set" else "Duplicate key set",
             initial = if (mode == SetNaming.Rename) set.name else "${set.name} copy",
             onDismiss = { naming = null },
@@ -309,23 +309,6 @@ fun KeyBarSettingsScreen(
 }
 
 private enum class SetNaming { Rename, Duplicate }
-
-@Composable
-private fun SetNameDialog(
-    title: String,
-    initial: String,
-    onDismiss: () -> Unit,
-    onSave: (String) -> Unit,
-) {
-    var name by remember { mutableStateOf(initial) }
-    LimentyDialog(title = title, onDismissRequest = onDismiss) {
-        LimentyField(label = "Name", value = name, onValueChange = { name = it })
-        LimentyDialogActions {
-            LimentyTextButton("Cancel", onDismiss, color = LimentyColors.Text2)
-            LimentyTextButton(label = "Save", onClick = { onSave(name.trim()) }, enabled = name.isNotBlank())
-        }
-    }
-}
 
 @Composable
 private fun SetTab(

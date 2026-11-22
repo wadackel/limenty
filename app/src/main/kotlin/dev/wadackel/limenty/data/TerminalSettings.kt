@@ -28,7 +28,9 @@ import kotlinx.coroutines.withContext
  */
 data class TerminalPreferences(
     val typography: TerminalTypography = TerminalTypography(),
-    val paletteName: String = TerminalPalette.Default.name,
+    /** A preset's name or a [CustomTheme.id]. Read [palette], which falls back when it names nothing. */
+    val themeId: String = TerminalPalette.Default.name,
+    val customThemes: List<CustomTheme> = emptyList(),
     val keepScreenAwake: Boolean = true,
     val allowPersonalizedLearning: Boolean = false,
     val keySets: List<KeySet> = listOf(KeySet.Default),
@@ -42,8 +44,26 @@ data class TerminalPreferences(
         require(keySets.isNotEmpty()) { "the bar needs at least one key set" }
     }
 
+    /**
+     * The default when [themeId] names nothing, rather than failing: a theme removed or renamed by a
+     * later version, or a custom one deleted, must not leave the terminal without colours.
+     */
     val palette: TerminalPalette
-        get() = TerminalPalette.All.firstOrNull { it.name == paletteName } ?: TerminalPalette.Default
+        get() = themeOf(themeId) ?: TerminalPalette.Default
+
+    /** Presets are found by name, which is the id they were stored under before there were others. */
+    fun themeOf(id: String): TerminalPalette? = customThemes.firstOrNull { it.id == id }?.palette
+        ?: TerminalPalette.All.firstOrNull { it.name == id }
+
+    fun addTheme(theme: CustomTheme): TerminalPreferences = copy(customThemes = customThemes + theme)
+
+    fun updateTheme(id: String, transform: (TerminalPalette) -> TerminalPalette): TerminalPreferences = copy(customThemes = customThemes.map { if (it.id == id) it.copy(palette = transform(it.palette)) else it })
+
+    /** Removing the theme in use puts the terminal back on the default rather than on a neighbour. */
+    fun removeTheme(id: String): TerminalPreferences = copy(
+        customThemes = customThemes.filterNot { it.id == id },
+        themeId = if (themeId == id) TerminalPalette.Default.name else themeId,
+    )
 
     /**
      * Clamped rather than trusted, because the position is stored apart from the list it points
@@ -199,7 +219,8 @@ class TerminalSettings(context: Context, private val scope: CoroutineScope) {
                 lineHeight = preferences.getFloat(KEY_LINE_HEIGHT, defaults.typography.lineHeight),
                 letterSpacingSp = preferences.getFloat(KEY_LETTER_SPACING, defaults.typography.letterSpacingSp),
             ),
-            paletteName = preferences.getString(KEY_PALETTE, defaults.paletteName)!!,
+            themeId = preferences.getString(KEY_PALETTE, defaults.themeId)!!,
+            customThemes = preferences.getString(KEY_CUSTOM_THEMES, null)?.let(CustomTheme::decode) ?: defaults.customThemes,
             keepScreenAwake = preferences.getBoolean(KEY_KEEP_AWAKE, defaults.keepScreenAwake),
             allowPersonalizedLearning = preferences.getBoolean(KEY_IME_LEARNING, defaults.allowPersonalizedLearning),
             keySets = preferences.getString(KEY_KEY_SETS, null)?.let(KeySet::decode)
@@ -218,7 +239,8 @@ class TerminalSettings(context: Context, private val scope: CoroutineScope) {
             .putFloat(KEY_FONT_SIZE, values.typography.fontSizeSp)
             .putFloat(KEY_LINE_HEIGHT, values.typography.lineHeight)
             .putFloat(KEY_LETTER_SPACING, values.typography.letterSpacingSp)
-            .putString(KEY_PALETTE, values.paletteName)
+            .putString(KEY_PALETTE, values.themeId)
+            .putString(KEY_CUSTOM_THEMES, CustomTheme.encode(values.customThemes))
             .putBoolean(KEY_KEEP_AWAKE, values.keepScreenAwake)
             .putBoolean(KEY_IME_LEARNING, values.allowPersonalizedLearning)
             .putString(KEY_KEY_SETS, KeySet.encode(values.keySets))
@@ -277,6 +299,7 @@ class TerminalSettings(context: Context, private val scope: CoroutineScope) {
         const val KEY_LINE_HEIGHT = "lineHeight"
         const val KEY_LETTER_SPACING = "letterSpacing"
         const val KEY_PALETTE = "palette"
+        const val KEY_CUSTOM_THEMES = "customThemes"
         const val KEY_IME_LEARNING = "imeLearning"
         const val KEY_KEEP_AWAKE = "keepAwake"
         const val KEY_AUX_KEYS = "auxKeys"

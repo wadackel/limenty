@@ -114,6 +114,8 @@ fun SettingsScreen(
     onChange: ((TerminalPreferences) -> TerminalPreferences) -> Unit,
     onBack: () -> Unit,
     onOpenKeyBar: () -> Unit = {},
+    /** Opens the editor on a custom theme, by id. */
+    onEditTheme: (String) -> Unit = {},
     /** Shown beside About, so which build this is can be read without opening it. */
     version: String = "",
     /** The About section's content. Supplied by the caller, which owns reading the licences. */
@@ -124,7 +126,7 @@ fun SettingsScreen(
     /** False while the screen slides out after the app has moved on; its own Back step stops then. */
     active: Boolean = true,
 ) {
-    val content = SettingsContent(preferences, typefaces, onChange, onDrag, onSettled, onOpenKeyBar, version, about)
+    val content = SettingsContent(preferences, typefaces, onChange, onDrag, onSettled, onOpenKeyBar, onEditTheme, version, about)
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
@@ -151,6 +153,7 @@ private class SettingsContent(
     val onDrag: ((TerminalPreferences) -> TerminalPreferences) -> Unit,
     val onSettled: () -> Unit,
     val onOpenKeyBar: () -> Unit,
+    val onEditTheme: (String) -> Unit,
     val version: String,
     val about: @Composable () -> Unit,
 )
@@ -293,11 +296,12 @@ private fun SettingsContent.AppearanceBody(themeColumns: Int) {
         modifier = Modifier.padding(horizontal = LocalSettingsFrame.current.margin).padding(bottom = 6.dp),
     )
     SettingsHeading("Theme", preferences.palette.name)
-    ThemeGrid(
-        selected = preferences.palette.name,
+    ThemePicker(
+        preferences = preferences,
         mono = typefaces.family(font),
         columns = themeColumns,
-        onSelect = { name -> onChange { it.copy(paletteName = name) } },
+        onChange = onChange,
+        onEditTheme = onEditTheme,
         modifier = Modifier.padding(horizontal = LocalSettingsFrame.current.margin),
     )
     SettingsHeading("Font", font.displayName)

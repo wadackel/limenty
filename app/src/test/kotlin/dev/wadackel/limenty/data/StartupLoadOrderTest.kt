@@ -139,7 +139,7 @@ class StartupLoadOrderTest {
     fun `a settings change made before the first load completes is applied on top of what was stored`() = runBlocking<Unit> {
         val seeded = TerminalSettings(context, scope)
         seeded.awaitLoaded()
-        seeded.update { it.copy(paletteName = "Nord", keepScreenAwake = false) }
+        seeded.update { it.copy(themeId = "Nord", keepScreenAwake = false) }
         awaitWrites(scope)
 
         val (settings, release, settingsScope) = parkedSettings()
@@ -151,7 +151,7 @@ class StartupLoadOrderTest {
 
         val reloaded = TerminalSettings(context, scope)
         reloaded.awaitLoaded()
-        assertThat(reloaded.values.value?.paletteName).isEqualTo("Nord")
+        assertThat(reloaded.values.value?.themeId).isEqualTo("Nord")
         assertThat(reloaded.values.value?.keepScreenAwake).isTrue()
     }
 }

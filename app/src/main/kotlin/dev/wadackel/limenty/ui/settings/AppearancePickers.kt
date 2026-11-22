@@ -2,12 +2,18 @@ package dev.wadackel.limenty.ui.settings
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.selection.selectable
@@ -17,47 +23,122 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.wadackel.limenty.core.terminal.TerminalFont
 import dev.wadackel.limenty.core.terminal.TerminalPalette
 import dev.wadackel.limenty.data.TerminalPreferences
 import dev.wadackel.limenty.terminal.TerminalTypefaces
+import dev.wadackel.limenty.ui.components.LimentyIconButton
+import dev.wadackel.limenty.ui.components.overhangVertically
 import dev.wadackel.limenty.ui.theme.LimentyColors
 import dev.wadackel.limenty.ui.theme.LimentyShapes
 import dev.wadackel.limenty.ui.theme.LimentyText
 
-/** The themes, [columns] to a row, each card an equal share of the width. */
+/**
+ * The presets, then the themes made here under their own heading, [columns] to a row, each card an
+ * equal share of the width. The tile that makes a new theme ends the grid, where the new one will
+ * appear.
+ */
 @Composable
 internal fun ThemeGrid(
-    selected: String,
+    preferences: TerminalPreferences,
     mono: FontFamily,
     columns: Int,
     onSelect: (String) -> Unit,
+    onMore: (String) -> Unit,
+    onNew: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val presets = TerminalPalette.All.map { ThemeTile.Theme(it.name, it) }
+    val custom = preferences.customThemes.map { ThemeTile.Theme(it.id, it.palette) } + ThemeTile.New
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(CARD_GAP)) {
-        TerminalPalette.All.chunked(columns).forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(CARD_GAP)) {
-                row.forEach { palette ->
-                    ThemeCard(
-                        palette = palette,
-                        mono = mono,
-                        selected = palette.name == selected,
-                        onSelect = { onSelect(palette.name) },
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-                // A short last row keeps the others' width rather than stretching to fill.
-                repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
-            }
+        TileRows(presets, columns) { tile -> ThemeTileContent(tile, preferences.themeId, mono, onSelect, onMore, onNew) }
+        Text(
+            "Your themes",
+            style = LimentyText.Secondary,
+            color = LimentyColors.Text3,
+            modifier = Modifier.padding(top = 6.dp),
+        )
+        TileRows(custom, columns) { tile -> ThemeTileContent(tile, preferences.themeId, mono, onSelect, onMore, onNew) }
+    }
+}
+
+private sealed interface ThemeTile {
+    data class Theme(val id: String, val palette: TerminalPalette) : ThemeTile
+
+    data object New : ThemeTile
+}
+
+@Composable
+private fun TileRows(tiles: List<ThemeTile>, columns: Int, tile: @Composable (ThemeTile) -> Unit) {
+    tiles.chunked(columns).forEach { row ->
+        // As tall as the tallest, so the new-theme tile matches the cards beside it.
+        Row(modifier = Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(CARD_GAP)) {
+            row.forEach { Box(modifier = Modifier.weight(1f).fillMaxHeight()) { tile(it) } }
+            // A short last row keeps the others' width rather than stretching to fill.
+            repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
         }
+    }
+}
+
+@Composable
+private fun ThemeTileContent(
+    tile: ThemeTile,
+    selectedId: String,
+    mono: FontFamily,
+    onSelect: (String) -> Unit,
+    onMore: (String) -> Unit,
+    onNew: () -> Unit,
+) {
+    when (tile) {
+        is ThemeTile.Theme -> ThemeCard(
+            palette = tile.palette,
+            mono = mono,
+            selected = tile.id == selectedId,
+            onSelect = { onSelect(tile.id) },
+            onMore = { onMore(tile.id) },
+            modifier = Modifier.fillMaxSize(),
+        )
+        ThemeTile.New -> NewThemeTile(onClick = onNew, modifier = Modifier.fillMaxSize())
+    }
+}
+
+/**
+ * The way to a theme of one's own: dashed, because it is a place for a card rather than one.
+ */
+@Composable
+private fun NewThemeTile(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val shape = LimentyShapes.Surface
+    Column(
+        modifier = modifier
+            .heightIn(min = 96.dp)
+            .clip(shape)
+            .drawBehind {
+                val radius = 12.dp.toPx()
+                drawRoundRect(
+                    color = LimentyColors.Line,
+                    cornerRadius = CornerRadius(radius, radius),
+                    style = Stroke(width = 1.5.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 5.dp.toPx()))),
+                )
+            }
+            .clickable(role = Role.Button, onClick = onClick),
+        verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text("+", style = LimentyText.Title, color = LimentyColors.Accent)
+        Text("New theme", style = LimentyText.Label)
     }
 }
 
@@ -75,6 +156,7 @@ fun ThemeCard(
     mono: FontFamily,
     selected: Boolean,
     onSelect: () -> Unit,
+    onMore: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val shape = LimentyShapes.Surface
@@ -112,8 +194,7 @@ fun ThemeCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 10.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
+                .padding(start = 12.dp, top = 10.dp, bottom = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
@@ -121,17 +202,17 @@ fun ThemeCard(
                 style = LimentyText.Secondary,
                 color = if (selected) LimentyColors.Accent else LimentyColors.Text,
                 maxLines = 1,
-                modifier = Modifier.weight(1f, fill = false),
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
             )
-            Row(modifier = Modifier.padding(start = 8.dp), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-                for (index in 1..6) {
-                    Box(
-                        modifier = Modifier
-                            .size(7.dp)
-                            .clip(RoundedCornerShape(2.dp))
-                            .background(Color(palette.resolve(index))),
-                    )
-                }
+            // In place of the six colour swatches the row used to end on: the sample above already
+            // shows the colours, and the row has room for one of the two.
+            LimentyIconButton(
+                contentDescription = "More for ${palette.name}",
+                onClick = onMore,
+                modifier = Modifier.overhangVertically(12.dp),
+            ) {
+                Text("···", color = LimentyColors.Text3, fontSize = 18.sp)
             }
         }
     }

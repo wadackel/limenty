@@ -44,6 +44,7 @@ import dev.wadackel.limenty.data.LanService
 import dev.wadackel.limenty.ui.components.LimentyDialog
 import dev.wadackel.limenty.ui.components.LimentyDialogActions
 import dev.wadackel.limenty.ui.components.LimentyMark
+import dev.wadackel.limenty.ui.components.LimentyMenuAction
 import dev.wadackel.limenty.ui.components.LimentyTextButton
 import dev.wadackel.limenty.ui.components.LimentyTextButtonInset
 import dev.wadackel.limenty.ui.components.SectionHeading
@@ -363,34 +364,14 @@ private fun HostMenu(
 ) {
     LimentyDialog(title = host.displayName, onDismissRequest = onDismiss) {
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            MenuAction("Edit", onEdit)
-            if (connected) MenuAction("Disconnect", onDisconnect)
-            MenuAction("Delete", onDelete, color = LimentyColors.Danger)
+            LimentyMenuAction("Edit", onEdit)
+            if (connected) LimentyMenuAction("Disconnect", onDisconnect)
+            LimentyMenuAction("Delete", onDelete, color = LimentyColors.Danger)
         }
         LimentyDialogActions {
             LimentyTextButton("Close", onDismiss, color = LimentyColors.Text2)
         }
     }
-}
-
-/**
- * A row of the menu: the whole width responds, and it is tall enough to hit without aiming.
- *
- * No inset of its own, so the word starts where the title above it does. An inset would buy the
- * press a margin at the cost of putting every choice a step in from the thing they are choices for.
- */
-@Composable
-private fun MenuAction(label: String, onClick: () -> Unit, color: Color = LimentyColors.Text) {
-    Text(
-        text = label,
-        style = LimentyText.Body,
-        color = color,
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(LimentyShapes.Surface)
-            .clickable(role = Role.Button, onClick = onClick)
-            .padding(vertical = 12.dp),
-    )
 }
 
 private val LIST_PANE_WIDTH = 340.dp

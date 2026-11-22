@@ -26,6 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -34,6 +35,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -321,3 +323,17 @@ fun LimentyPrimaryButton(
  * does puts its word a whole inset further in than everything above and below it.
  */
 val LimentyTextButtonInset = 12.dp
+
+/**
+ * Takes [amount] off the top and bottom of what the layout sees, without moving the content.
+ *
+ * For a 44dp target set into a line of text: the line keeps its own height rather than growing to
+ * the target's, and the target still answers over the whole 44dp.
+ */
+fun Modifier.overhangVertically(amount: Dp) = layout { measurable, constraints ->
+    val placeable = measurable.measure(constraints)
+    val trim = amount.roundToPx()
+    layout(placeable.width, (placeable.height - 2 * trim).coerceAtLeast(0)) {
+        placeable.place(0, -trim)
+    }
+}

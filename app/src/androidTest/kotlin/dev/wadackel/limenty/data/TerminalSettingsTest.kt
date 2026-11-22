@@ -80,14 +80,24 @@ class TerminalSettingsTest {
 
     @Test
     fun theChosenThemeIsRemembered() {
-        writeSettings { it.copy(paletteName = TerminalPalette.Nord.name) }
+        writeSettings { it.copy(themeId = TerminalPalette.Nord.name) }
 
         assertThat(storedValues().palette).isEqualTo(TerminalPalette.Nord)
     }
 
     @Test
+    fun customThemesAndTheOneInUseAreRememberedAcrossRestarts() {
+        val mine = CustomTheme("custom:test", TerminalPalette.Nord.copy(name = "Mine", background = 0xFF101010.toInt()))
+        writeSettings { it.addTheme(mine).copy(themeId = mine.id) }
+
+        val reloaded = storedValues()
+        assertThat(reloaded.customThemes).containsExactly(mine)
+        assertThat(reloaded.palette).isEqualTo(mine.palette)
+    }
+
+    @Test
     fun aThemeThatNoLongerExistsFallsBackRatherThanFailing() {
-        writeSettings { it.copy(paletteName = "a-theme-from-a-later-version") }
+        writeSettings { it.copy(themeId = "a-theme-from-a-later-version") }
 
         assertThat(storedValues().palette).isEqualTo(TerminalPalette.Default)
     }
@@ -193,7 +203,7 @@ class TerminalSettingsTest {
     @Test
     fun oneChangeDoesNotResetTheRest() {
         writeSettings { it.copy(keepScreenAwake = false) }
-        writeSettings { it.copy(paletteName = TerminalPalette.Nord.name) }
+        writeSettings { it.copy(themeId = TerminalPalette.Nord.name) }
 
         val values = storedValues()
         assertThat(values.keepScreenAwake).isFalse()
