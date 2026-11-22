@@ -1,5 +1,9 @@
 package dev.wadackel.limenty.ui.theme
 
+import android.graphics.Color
+import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
@@ -37,4 +41,15 @@ private val LimentyColorScheme = darkColorScheme(
 @Composable
 fun LimentyTheme(content: @Composable () -> Unit) {
     MaterialTheme(colorScheme = LimentyColorScheme, content = content)
+}
+
+/**
+ * Edge-to-edge with the system bars drawn for the chrome, which is dark whatever the Android setting.
+ * The default style reads the system's night mode instead, and in light mode draws dark icons on it.
+ */
+fun ComponentActivity.enableLimentyEdgeToEdge() {
+    // `auto` told the background is always dark, not `SystemBarStyle.dark`: that one also turns off
+    // the scrim the system draws behind three-button navigation.
+    val dark = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT) { true }
+    enableEdgeToEdge(statusBarStyle = dark, navigationBarStyle = dark)
 }
