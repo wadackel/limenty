@@ -180,7 +180,29 @@ class TerminalView(context: Context) : TerminalInputView(context) {
         val cell = CellPixelSize(metrics.cellWidth.roundToInt().coerceAtLeast(1), metrics.cellHeight.roundToInt().coerceAtLeast(1))
         if (columns == current.emulator.columns && rows == current.emulator.rows && cell == current.emulator.cellPixelSize) return
         resizeLog.i("viewport.apply", "cols" to columns, "rows" to rows, "cellWidthPx" to cell.width, "cellHeightPx" to cell.height)
-        current.resize(columns, rows, cell.width, cell.height)
+        // Under the lock throughout, so output arriving between the two reads cannot be taken
+        // for something the resize did.
+        val lost = synchronized(current.lock) {
+            val before = selection?.let { selectedText() }
+            current.resize(columns, rows, cell.width, cell.height)
+            if (before == null) return@synchronized false
+            // A range past a narrower grid would put its handle off the view. Clamped before the
+            // second read, because pulling an end left onto the grid can take in text it never
+            // covered, and that has to count as the selection changing.
+            selection = selection?.clampedTo(columns)
+            selectionAnchor = selectionAnchor?.clampedTo(columns)
+            selectedText() != before
+        }
+        // Nothing reflows: a narrower screen cuts rows off and the cut text is gone, so a range
+        // over it now reads as something else. Copy would hand that over as if it were what the
+        // user picked; dropping the selection is the honest answer.
+        if (lost) {
+            releaseHandle()
+            handleHeld = false
+            selection = null
+            onSelectionChanged(null)
+            resizeLog.i("selection.dropped")
+        }
     }
 
     override fun onDraw(canvas: Canvas) {

@@ -252,6 +252,33 @@ class TerminalRegressionTest {
         assertThat(small.buffer.totalLinesScrolled).isAtLeast(17L)
     }
 
+    @Test
+    fun `a line keeps its address when a taller screen pulls history back above it`() {
+        val small = TerminalEmulator(columns = 10, rows = 3)
+        repeat(8) { small.write("line$it\r\n") }
+        val address = small.buffer.totalLinesScrolled + 1
+        val text = small.buffer.line(1)?.text()?.trimEnd()
+
+        small.resize(10, 6)
+
+        val index = (address - small.buffer.totalLinesScrolled).toInt()
+        assertThat(small.buffer.line(index)?.text()?.trimEnd()).isEqualTo(text)
+    }
+
+    @Test
+    fun `a line keeps its address across a shorter screen and back`() {
+        val small = TerminalEmulator(columns = 10, rows = 6)
+        repeat(8) { small.write("line$it\r\n") }
+        val address = small.buffer.totalLinesScrolled + 4
+        val text = small.buffer.line(4)?.text()?.trimEnd()
+
+        small.resize(10, 3)
+        small.resize(10, 6)
+
+        val index = (address - small.buffer.totalLinesScrolled).toInt()
+        assertThat(small.buffer.line(index)?.text()?.trimEnd()).isEqualTo(text)
+    }
+
     private fun allText(): String {
         val from = -terminal.buffer.scrollbackSize
         return terminal.buffer.snapshotText(from, terminal.rows).trim()
