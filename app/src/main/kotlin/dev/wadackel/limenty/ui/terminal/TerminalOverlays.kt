@@ -23,6 +23,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -178,6 +179,11 @@ private fun Overlay(title: String, content: @Composable ColumnScope.() -> Unit) 
         modifier = Modifier
             .fillMaxSize()
             .background(LimentyColors.Scrim)
+            // Hit but not handled: a background takes no input, so without a hit target here a tap
+            // on the dim area would go on to the terminal's own gestures, or to the screen under the
+            // trust prompt. Not `clickable {}`, which would also announce the dim area to TalkBack
+            // as a button that does nothing.
+            .pointerInput(Unit) {}
             // The box holds the button the user is about to press, and a soft keyboard raised by
             // its own field would otherwise cover it (a password retry, a failed connection and a
             // closed session all put an action here).
