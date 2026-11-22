@@ -28,6 +28,13 @@ data class SelectionRange(
         )
     }
 
+    /** The same range with neither end past the last of [columns]. */
+    fun clampedTo(columns: Int): SelectionRange {
+        val last = columns - 1
+        if (startColumn <= last && endColumn <= last) return this
+        return copy(startColumn = startColumn.coerceAtMost(last), endColumn = endColumn.coerceAtMost(last))
+    }
+
     /** The same range with its start before its end, whichever way the handles were dragged. */
     val normalized: SelectionRange
         get() = if (startLine < endLine || (startLine == endLine && startColumn <= endColumn)) {

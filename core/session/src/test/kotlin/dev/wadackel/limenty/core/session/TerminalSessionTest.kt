@@ -323,6 +323,20 @@ class TerminalSessionTest {
     }
 
     @Test
+    fun `growing while scrolled back keeps the same content on screen`() = runTest(UnconfinedTestDispatcher()) {
+        val session = sessionIn(backgroundScope, columns = 20, rows = 4)
+        session.connect(config(columns = 20, rows = 4))
+        repeat(40) { transport.emit("line$it\r\n") }
+        session.scrollBy(12)
+        val watched = lineAtTopOfScreen(session)
+
+        // A soft keyboard closing is a growth, and it pulls lines back out of scrollback.
+        session.resize(20, 10, 8, 16)
+
+        assertThat(lineAtTopOfScreen(session)).isEqualTo(watched)
+    }
+
+    @Test
     fun `entering the alternate screen returns the viewport to the live screen`() = runTest(UnconfinedTestDispatcher()) {
         val session = sessionIn(backgroundScope)
         session.connect(config())

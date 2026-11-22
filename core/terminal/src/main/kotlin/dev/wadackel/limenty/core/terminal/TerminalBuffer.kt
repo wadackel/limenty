@@ -29,10 +29,13 @@ class TerminalBuffer(
     val scrollbackSize: Int get() = scrollback.size
 
     /**
-     * Total lines ever pushed into scrollback, never reset.
+     * Lines pushed into scrollback, less those a taller screen pulled back out; never reset.
      *
-     * Line indices shift as the buffer scrolls and as old lines are dropped at the cap, so a
-     * selection or a scroll position needs an identity that survives both.
+     * Line indices shift as the buffer scrolls, as old lines are dropped at the cap, and as a
+     * resize moves lines between the screen and scrollback, so a selection or a scroll position
+     * needs an identity that survives all three: this count plus a line's index stays the same
+     * for as long as the line is kept. Counting pushes alone left every line pulled back by a
+     * taller screen one address off, and a selection then covered the text above its own.
      */
     var totalLinesScrolled: Long = 0L
         private set
@@ -189,6 +192,7 @@ class TerminalBuffer(
                 // colour happens to be active would tint old output on every unfold.
                 restored.resize(columns, Pen.Default)
                 screen.add(0, restored)
+                totalLinesScrolled--
                 placementList.forEach { it.row += 1 }
                 adjustedCursorRow++
                 toAdd--

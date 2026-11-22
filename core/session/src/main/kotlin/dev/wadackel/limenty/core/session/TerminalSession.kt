@@ -326,11 +326,9 @@ class TerminalSession(
             emulator.cellPixelSize = CellPixelSize(cellWidthPx, cellHeightPx)
             cellMeasured = true
             val scrolledBefore = emulator.buffer.totalLinesScrolled
-            val historyBefore = emulator.buffer.scrollbackSize
             emulator.resize(columns, rows)
-            val pushed = emulator.buffer.totalLinesScrolled - scrolledBefore
-            val pulled = (historyBefore - emulator.buffer.scrollbackSize).coerceAtLeast(0)
-            (pushed - pulled) to emulator.cellPixelSize
+            // The count falls for each line pulled back, so its change is already pushed - pulled.
+            (emulator.buffer.totalLinesScrolled - scrolledBefore) to emulator.cellPixelSize
         }
         _scrollOffset.update { current ->
             if (current == 0) 0 else (current + scrolled.toInt()).coerceAtMost(maxScrollOffset())
