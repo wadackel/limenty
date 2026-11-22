@@ -100,7 +100,7 @@ fun KeyBarSettingsScreen(
     var naming by remember { mutableStateOf<SetNaming?>(null) }
     var deleting by remember { mutableStateOf(false) }
 
-    var editing by remember { mutableStateOf<AuxiliaryKey?>(null) }
+    var editing by remember { mutableStateOf<KeySlot?>(null) }
     var adding by remember { mutableStateOf(false) }
     // Per set: a drag state keeps the slots it measured by position, and the next set's keys are
     // somewhere else.
@@ -186,7 +186,7 @@ fun KeyBarSettingsScreen(
                     PinnedRow(
                         key = key,
                         dragged = pinnedOrder.dragging == index,
-                        onEdit = { editing = key },
+                        onEdit = { editing = KeySlot(pinned = true, index) },
                         modifier = Modifier.reorderable(pinnedOrder, index, pinned.size, key.spoken()),
                     )
                 }
@@ -215,7 +215,7 @@ fun KeyBarSettingsScreen(
                     ScrollingChip(
                         key = key,
                         dragged = scrollingOrder.dragging == index,
-                        onEdit = { editing = key },
+                        onEdit = { editing = KeySlot(pinned = false, index) },
                         modifier = Modifier.reorderable(scrollingOrder, index, scrolling.size, key.spoken()),
                     )
                 }
@@ -224,33 +224,27 @@ fun KeyBarSettingsScreen(
         }
     }
 
-    editing?.let { key ->
-        val isPinned = pinned.contains(key)
+    editing?.let { slot ->
+        val row = if (slot.pinned) pinned else scrolling
+        val onRowChange = if (slot.pinned) onPinnedChange else onScrollingChange
+        val key = row.getOrNull(slot.index) ?: return@let
+        val withoutKey = row.filterIndexed { at, _ -> at != slot.index }
         AuxiliaryKeyDialog(
             initial = key,
             onDismiss = { editing = null },
             onSave = { updated ->
-                if (isPinned) {
-                    onPinnedChange(pinned.map { if (it == key) updated else it })
-                } else {
-                    onScrollingChange(scrolling.map { if (it == key) updated else it })
-                }
+                onRowChange(row.mapIndexed { at, it -> if (at == slot.index) updated else it })
                 editing = null
             },
             placement = KeyPlacement(
-                pinned = isPinned,
+                pinned = slot.pinned,
                 onTogglePin = {
-                    if (isPinned) {
-                        onPinnedChange(pinned - key)
-                        onScrollingChange(scrolling + key)
-                    } else {
-                        onScrollingChange(scrolling - key)
-                        onPinnedChange(pinned + key)
-                    }
+                    onRowChange(withoutKey)
+                    if (slot.pinned) onScrollingChange(scrolling + key) else onPinnedChange(pinned + key)
                     editing = null
                 },
                 onRemove = {
-                    if (isPinned) onPinnedChange(pinned - key) else onScrollingChange(scrolling - key)
+                    onRowChange(withoutKey)
                     editing = null
                 },
             ),
@@ -309,6 +303,12 @@ fun KeyBarSettingsScreen(
 }
 
 private enum class SetNaming { Rename, Duplicate }
+
+/**
+ * A key by where it sits rather than by what it is. Two keys can be equal (Add key starts as the
+ * Escape the default set already has), and finding the one being edited by value would edit both.
+ */
+private data class KeySlot(val pinned: Boolean, val index: Int)
 
 @Composable
 private fun SetTab(
