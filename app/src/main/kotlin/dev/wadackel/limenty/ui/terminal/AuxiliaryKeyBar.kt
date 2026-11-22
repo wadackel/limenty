@@ -60,6 +60,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -230,6 +231,10 @@ private fun SetMarks(index: Int, count: Int, modifier: Modifier = Modifier) {
  *
  * Not on first composition: arriving at the terminal is not a switch, and a name flashing every
  * time the screen opens would teach that it means nothing.
+ *
+ * A name has no length limit, so a long one ends in an ellipsis inside the bar's edge padding, as
+ * the set tabs in the settings do, rather than being clipped at the screen edge with no sign that
+ * any of it is missing.
  */
 @Composable
 private fun SetName(index: Int, name: String, modifier: Modifier = Modifier) {
@@ -242,12 +247,18 @@ private fun SetName(index: Int, name: String, modifier: Modifier = Modifier) {
         delay(NAME_MILLIS)
         visible = false
     }
-    AnimatedVisibility(visible = visible, modifier = modifier.aboveBar(), enter = EnterTransition.None, exit = fadeOut(tween(SLIDE_MILLIS))) {
+    AnimatedVisibility(
+        visible = visible,
+        modifier = modifier.padding(horizontal = EDGE_PADDING).aboveBar(),
+        enter = EnterTransition.None,
+        exit = fadeOut(tween(SLIDE_MILLIS)),
+    ) {
         Text(
             text = name,
             style = LimentyText.Secondary,
             color = LimentyColors.Accent,
             maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
             modifier = Modifier
                 .clip(LimentyShapes.Small)
                 .background(LimentyColors.Surface3)
