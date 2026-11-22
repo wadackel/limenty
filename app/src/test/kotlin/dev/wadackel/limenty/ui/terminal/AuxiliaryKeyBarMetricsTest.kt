@@ -2,6 +2,7 @@ package dev.wadackel.limenty.ui.terminal
 
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import dev.wadackel.limenty.ui.settings.fitReading
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -85,5 +86,24 @@ class AuxiliaryKeyBarMetricsTest {
         assertDp(436.dp, metrics.scrollRoom(metrics.coverWidth, 0.dp))
         // One pinned dp brings the divider back: 460 − 24 − 21 − 1.
         assertDp(414.dp, metrics.scrollRoom(metrics.coverWidth, 1.dp))
+    }
+
+    @Test
+    fun `the note reads how much of the cover a run leaves`() {
+        val run = metrics.pinnedRun(List(4) { metrics.keyWidth("←", textWidth("←")) })
+        assertEquals("pinned 164dp · scroll 251dp of 460dp", fitReading(run, metrics.scrollRoom(metrics.coverWidth, run)))
+    }
+
+    @Test
+    fun `a run wider than the cover reads as no room rather than a negative width`() {
+        assertEquals("pinned 505dp · no room to scroll in 460dp", fitReading(505.dp, metrics.scrollRoom(metrics.coverWidth, 505.dp)))
+    }
+
+    /** Compared after rounding, so `scroll 0dp` never reaches the screen. */
+    @Test
+    fun `a room that rounds to nothing reads as no room`() {
+        assertEquals("pinned 415dp · no room to scroll in 460dp", fitReading(415.dp, 0.4.dp))
+        assertEquals("pinned 415dp · no room to scroll in 460dp", fitReading(415.dp, (-0.4).dp))
+        assertEquals("pinned 414dp · scroll 1dp of 460dp", fitReading(414.dp, 1.dp))
     }
 }
