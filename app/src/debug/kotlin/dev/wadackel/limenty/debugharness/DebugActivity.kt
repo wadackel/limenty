@@ -3,7 +3,6 @@ package dev.wadackel.limenty.debugharness
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -22,6 +21,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import dev.wadackel.limenty.ui.theme.LimentyTheme
+import dev.wadackel.limenty.ui.theme.enableLimentyEdgeToEdge
 
 /**
  * Debug-only harness. It lives in the `debug` source set so it cannot reach a release build, which
@@ -29,7 +29,7 @@ import dev.wadackel.limenty.ui.theme.LimentyTheme
  */
 class DebugActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
-        enableEdgeToEdge()
+        enableLimentyEdgeToEdge()
         super.onCreate(savedInstanceState)
         setContent { LimentyTheme { DebugHarness() } }
     }

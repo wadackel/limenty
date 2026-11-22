@@ -6,7 +6,6 @@ import android.content.res.Configuration
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
@@ -18,13 +17,14 @@ import dev.wadackel.limenty.core.common.log.LogTags
 import dev.wadackel.limenty.core.common.log.TermLog
 import dev.wadackel.limenty.ui.LimentyApp
 import dev.wadackel.limenty.ui.theme.LimentyTheme
+import dev.wadackel.limenty.ui.theme.enableLimentyEdgeToEdge
 
 class MainActivity : ComponentActivity() {
     private val log = TermLog.logger(LogTags.LIFECYCLE)
     private val resizeLog = TermLog.logger(LogTags.RESIZE)
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        enableEdgeToEdge()
+        enableLimentyEdgeToEdge()
         super.onCreate(savedInstanceState)
         log.i("activity.create", "restored" to (savedInstanceState != null))
         logWindowMetrics("create")
