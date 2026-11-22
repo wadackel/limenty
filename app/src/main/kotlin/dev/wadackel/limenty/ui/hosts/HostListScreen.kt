@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import dev.wadackel.limenty.core.terminal.TerminalPalette
 import dev.wadackel.limenty.data.HostProfile
 import dev.wadackel.limenty.data.LanService
+import dev.wadackel.limenty.data.sharingTrustedKeyWith
 import dev.wadackel.limenty.ui.components.LimentyDialog
 import dev.wadackel.limenty.ui.components.LimentyDialogActions
 import dev.wadackel.limenty.ui.components.LimentyMark
@@ -226,7 +227,7 @@ fun HostListScreen(
             title = "Delete ${host.displayName}?",
             onDismissRequest = { pendingDeletion = null },
         ) {
-            Text("The saved password and trusted host key are removed too.", style = LimentyText.Secondary)
+            Text(deletionNote(host, hosts.sharingTrustedKeyWith(host)), style = LimentyText.Secondary)
             LimentyDialogActions {
                 LimentyTextButton(
                     label = "Cancel",
@@ -244,6 +245,21 @@ fun HostListScreen(
             }
         }
     }
+}
+
+/**
+ * What deleting [host] takes with it. The trusted key is kept while [sharing] hosts still connect
+ * to the same address, and a user deleting to clear a changed key has to know it is still there.
+ */
+private fun deletionNote(host: HostProfile, sharing: List<HostProfile>): String {
+    if (sharing.isEmpty()) return "The saved password and trusted host key are removed too."
+    val others = when (sharing.size) {
+        1 -> sharing[0].displayName
+        2 -> "${sharing[0].displayName} and ${sharing[1].displayName}"
+        else -> "${sharing[0].displayName} and ${sharing.size - 1} other hosts"
+    }
+    return "The saved password is removed too. The trusted host key stays, because $others " +
+        "also ${if (sharing.size == 1) "connects" else "connect"} to ${host.hostname} on port ${host.port}."
 }
 
 /**

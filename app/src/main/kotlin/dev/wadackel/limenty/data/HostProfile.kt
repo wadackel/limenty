@@ -41,6 +41,12 @@ data class HostProfile(
 }
 
 /**
+ * The other saved hosts that reach the same hostname and port as [host], and so share its trusted
+ * key: keys are remembered per address, not per profile.
+ */
+fun List<HostProfile>.sharingTrustedKeyWith(host: HostProfile): List<HostProfile> = filter { it.id != host.id && it.hostname == host.hostname && it.port == host.port }
+
+/**
  * The machine's own part of [hostname]: its first label for a DNS name, the whole of it for an IP
  * literal. An address has no part that names the machine, and cutting `10.0.2.2` at its first dot
  * named the host `10`.
