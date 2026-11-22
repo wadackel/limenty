@@ -79,6 +79,7 @@ class KeyBarIdenticalKeysTest {
         press("Esc")
         rule.onNode(hasText("Pin right")).assertExists()
         press("Remove")
+        press("Remove")
 
         assertEquals(listOf(tab), preferences.keySet.scrolling)
         assertEquals(listOf(esc), preferences.keySet.pinned)
