@@ -34,6 +34,7 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
@@ -51,6 +52,9 @@ import kotlin.math.roundToInt
  * The value on the right is what lets the section be read without opening it — `Theme · Nord`
  * answers the question most visits to this screen are asking. Spaced-out monospaced capitals were
  * tried first and read as a terminal's output rather than as a label for the controls under it.
+ *
+ * The value is cut to one line: a theme's name has no length limit, and a second line wraps round
+ * to sit beside the title on the bottom-aligned row, where the two read as one string.
  */
 @Composable
 fun SectionHeading(title: String, value: String? = null, modifier: Modifier = Modifier) {
@@ -61,7 +65,13 @@ fun SectionHeading(title: String, value: String? = null, modifier: Modifier = Mo
     ) {
         Text(text = title, style = LimentyText.Section)
         if (value != null) {
-            Text(text = value, style = LimentyText.Secondary)
+            Text(
+                text = value,
+                style = LimentyText.Secondary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false).padding(start = LimentySpacing.SmallPadding),
+            )
         }
     }
 }
