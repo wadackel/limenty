@@ -185,6 +185,7 @@ private fun BuildRow(label: String, value: String, dirty: Boolean = false, onCop
     Row(
         modifier = Modifier
             .width(300.dp)
+            .heightIn(min = 44.dp)
             .clip(LimentyShapes.Small)
             .clickable(onClickLabel = "Copy $label", onClick = onCopy)
             .padding(vertical = 5.dp),
