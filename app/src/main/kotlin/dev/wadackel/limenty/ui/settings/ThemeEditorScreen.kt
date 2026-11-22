@@ -406,25 +406,21 @@ private fun ColorControls(
             }
             LimentyTextButton("Revert", onClick = onRevert, enabled = changed)
         }
-        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            LimentyField(
-                label = "Hex",
-                value = hex,
-                onValueChange = { text ->
-                    hex = text
-                    parseHex(text)?.let { value -> if (value != argb) onSet(value, false) }
-                },
-                keyboardOptions = KeyboardOptions(
-                    capitalization = KeyboardCapitalization.Characters,
-                    keyboardType = KeyboardType.Ascii,
-                    autoCorrectEnabled = false,
-                    imeAction = ImeAction.Done,
-                ),
-            )
-            if (looksMistyped(hex)) {
-                Text("Enter six hex digits, like #7AA2F7", style = LimentyText.Secondary, color = LimentyColors.Danger)
-            }
-        }
+        LimentyField(
+            label = "Hex",
+            value = hex,
+            onValueChange = { text ->
+                hex = text
+                parseHex(text)?.let { value -> if (value != argb) onSet(value, false) }
+            },
+            keyboardOptions = KeyboardOptions(
+                capitalization = KeyboardCapitalization.Characters,
+                keyboardType = KeyboardType.Ascii,
+                autoCorrectEnabled = false,
+                imeAction = ImeAction.Done,
+            ),
+            error = if (looksMistyped(hex)) "Enter six hex digits, like #7AA2F7" else null,
+        )
         ColorSlider(
             label = "Lightness",
             value = lch.lightness.toFloat(),
