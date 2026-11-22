@@ -25,7 +25,7 @@ There are no borders. A surface that is nearer is lighter:
 | `Bg` | `#0C0C0F` | the screen |
 | `Surface` | `#17161B` | a card, a settings group, the detail pane on the unfolded display, the key bar |
 | `Surface2` | `#1E1D22` | a surface placed on a surface (a group inside the detail pane), a pinned key, a field |
-| `Surface3` | `#25242A` | the nearest thing: a connected host, a dialog, a key that scrolls |
+| `Surface3` | `#25242A` | the nearest thing: a dialog, a key that scrolls |
 | `Line` | `#36343B` | the rare hairline between things on one surface (the key bar's pinned edge) |
 
 The greys lean slightly towards the accent's hue (oklch hue 295, about 60% of the way from neutral).
@@ -55,8 +55,8 @@ text takes one of these; there were eleven sizes before, and none of them read a
 |---|---|---|
 | `Accent` | `#A99BEA` | anything that can be pressed or is selected, section headings, the one filled button; not a key over the terminal |
 | `OnAccent` | `#1E1838` | text on an accent fill |
-| `AccentSelection` | accent at 18% | the background of the selected item in a list, behind accent text |
-| `Ok` / `OkSurface` | `#73C786` / `#122D19` | a live session: the dot and the `Connected` chip; a key bar that fits |
+| `AccentSelection` | accent at 18% | the background of the selected item in a list: behind accent text in the settings index, behind `Text` in the host list, where a host keeps the name its card shows |
+| `Ok` | `#73C786` | a live session: the dot before a host's name; a key bar that fits |
 | `Warn` / `WarnSurface` | `#ECC16B` / `#312408` | something to read before going on: a changed host key, a notice, a key bar too tight to scroll, a `-dirty` build |
 | `Danger` / `DangerSurface` | `#F8818D` / `#3B1B1E` | something that cannot be undone: deleting, trusting a new host key |
 
@@ -65,7 +65,7 @@ the accent and a status colour on it reads as one palette. Pastel versions (Mate
 too close to white to tell apart; saturated ones competed with the accent. Deletion used to borrow
 the warning colour, which made "read this" and "this cannot be undone" the same signal.
 
-A status colour is used on its own surface (`OkSurface` behind `Ok` text) or as text on a neutral
+A status colour is used on its own surface (`WarnSurface` behind `Warn` text) or as text on a neutral
 surface, never as a fill behind dark text.
 
 ## Corners
@@ -104,9 +104,12 @@ exception it argues for: its keys are drawn 32 tall in a 44 row, and their hit a
 The Fold has a 475×751dp cover display and a 933×704dp inner one (landscape). Below 700dp of width a
 screen is laid out for the cover; above it, for the inner display.
 
-- **Host list.** Cover: cards in one column; a connected host shows its session preview. Inner: list
-  and detail — the hosts on the left, the selected one on the right in a floating pane whose large
-  preview is itself the way back into the session.
+- **Host list.** Cover: cards in one column, all on `Surface`; a connected host has a dot before its
+  name and shows its session preview. Inner: list and detail — the hosts on the left, the selected
+  one on the right in a floating pane whose large preview is itself the way back into the session.
+  On both, the session's meta line and `Resume ›` sit under the preview, never over it: the preview
+  is what is being resumed, and a label on its corner covered part of it. The state is not said
+  twice — a chip beside `···` read as part of the menu, and a lighter card repeated the preview.
 - **Settings.** Cover: an index (Appearance, Keyboard & key bar, Gestures, Keep screen awake, About),
   each row showing its current value, opening a sub-screen. Inner: the index on the left, the
   selected sub-screen on the right in a floating pane. Fourteen gesture bindings and three pickers on
