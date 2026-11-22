@@ -52,6 +52,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.wadackel.limenty.core.input.TerminalKey
 import dev.wadackel.limenty.data.AuxiliaryKey
@@ -369,8 +370,7 @@ private fun FitNote(pinned: List<AuxiliaryKey>, modifier: Modifier = Modifier) {
     }
     val room = metrics.scrollRoom(COVER_WIDTH, run)
     val tight = room < MIN_SCROLLING
-    val reading = "pinned ${run.value.roundToInt()}dp · scroll ${room.value.roundToInt()}dp " +
-        "of ${COVER_WIDTH.value.roundToInt()}dp"
+    val reading = fitReading(run, room)
     Text(
         // Wraps rather than clips. Held to one line it lost its second half at a raised font scale,
         // and a note that reads `pinned 349dp ·` has kept the half nobody needed.
@@ -384,6 +384,20 @@ private fun FitNote(pinned: List<AuxiliaryKey>, modifier: Modifier = Modifier) {
         color = if (tight) LimentyColors.Warn else LimentyColors.Ok,
         textAlign = TextAlign.End,
     )
+}
+
+/**
+ * The words of [FitNote] for a pinned run of [run] that leaves [room] on the cover display.
+ *
+ * Pinned keys wider than the cover leave a negative room, and `scroll -90dp` has no meaning to
+ * anyone reading it, so a room that rounds to nothing is said in words. Compared after rounding,
+ * so the note never reads `scroll 0dp` either.
+ */
+internal fun fitReading(run: Dp, room: Dp): String {
+    val cover = COVER_WIDTH.value.roundToInt()
+    val left = room.value.roundToInt()
+    val scroll = if (left > 0) "scroll ${left}dp of ${cover}dp" else "no room to scroll in ${cover}dp"
+    return "pinned ${run.value.roundToInt()}dp · $scroll"
 }
 
 @Composable
