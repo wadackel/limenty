@@ -1,6 +1,7 @@
 package dev.wadackel.limenty.data
 
 import android.app.Application
+import dev.wadackel.limenty.ui.settings.refusedImportMessage
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -102,14 +103,56 @@ selection-foreground = #1e1e2e
     fun `a theme without one of its sixteen colours is refused, naming it`() {
         val withoutThree = ghostty.lines().filterNot { it.startsWith("palette = 3=") }.joinToString("\n")
 
-        assertEquals(ThemeImport.Incomplete(listOf("palette 3")), ThemeImport.parse(withoutThree))
+        assertEquals(ThemeImport.Refused(missing = listOf("palette 3"), unreadable = emptyList()), ThemeImport.parse(withoutThree))
     }
 
     @Test
     fun `a windows terminal scheme without a background is refused in its own words`() {
         val withoutBackground = windowsTerminal.lines().filterNot { it.contains("\"background\"") }.joinToString("\n")
 
-        assertEquals(ThemeImport.Incomplete(listOf("background")), ThemeImport.parse(withoutBackground))
+        assertEquals(ThemeImport.Refused(missing = listOf("background"), unreadable = emptyList()), ThemeImport.parse(withoutBackground))
+    }
+
+    @Test
+    fun `a windows terminal colour that is there but not six hex digits is refused as unreadable, not missing`() {
+        for (value in listOf("#fff", "#C50F1F12", "red")) {
+            val scheme = windowsTerminal.replace("\"red\": \"#f38ba8\"", "\"red\": \"$value\"")
+
+            assertEquals(value, ThemeImport.Refused(missing = emptyList(), unreadable = listOf("red")), ThemeImport.parse(scheme))
+        }
+    }
+
+    @Test
+    fun `a windows terminal colour set to null is missing`() {
+        val scheme = windowsTerminal.replace("\"red\": \"#f38ba8\"", "\"red\": null")
+
+        assertEquals(ThemeImport.Refused(missing = listOf("red"), unreadable = emptyList()), ThemeImport.parse(scheme))
+    }
+
+    @Test
+    fun `a ghostty palette entry that does not read is refused as unreadable, alongside what is missing`() {
+        val text = ghostty.replace("palette = 5=#f5c2e7", "palette = 5=zzz").lines().filterNot { it.startsWith("background") }.joinToString("\n")
+
+        assertEquals(ThemeImport.Refused(missing = listOf("background"), unreadable = listOf("palette 5")), ThemeImport.parse(text))
+    }
+
+    @Test
+    fun `an optional colour that does not read falls back as though it were left out`() {
+        val text = ghostty.replace("cursor-color = #f5e0dc", "cursor-color = cell-foreground")
+
+        val palette = read(text).palette
+
+        assertEquals(palette.foreground, palette.cursor)
+    }
+
+    @Test
+    fun `the refusal names what is missing and what does not read`() {
+        assertEquals("The theme is missing red.", refusedImportMessage(ThemeImport.Refused(listOf("red"), emptyList())))
+        assertEquals("red needs six hex digits, like #7AA2F7.", refusedImportMessage(ThemeImport.Refused(emptyList(), listOf("red"))))
+        assertEquals(
+            "The theme is missing background. palette 5, palette 9 need six hex digits, like #7AA2F7.",
+            refusedImportMessage(ThemeImport.Refused(listOf("background"), listOf("palette 5", "palette 9"))),
+        )
     }
 
     @Test

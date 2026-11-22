@@ -14,8 +14,11 @@ sealed interface ThemeImport {
     /** [palette]'s name is the one the text gave, or a stand-in when it gave none. */
     data class Read(val palette: TerminalPalette) : ThemeImport
 
-    /** Recognised, but without colours a theme needs; [missing] uses the text's own key names. */
-    data class Incomplete(val missing: List<String>) : ThemeImport
+    /**
+     * Recognised, but [missing] colours a theme needs, or giving [unreadable] ones that are not six
+     * hex digits. Both use the text's own key names.
+     */
+    data class Refused(val missing: List<String>, val unreadable: List<String>) : ThemeImport
 
     data object Unrecognised : ThemeImport
 
@@ -33,15 +36,17 @@ sealed interface ThemeImport {
 
         private fun windowsTerminal(text: String): ThemeImport {
             val json = runCatching { JSONObject(text) }.getOrNull() ?: return Unrecognised
-            fun colour(key: String) = json.optString(key).takeIf { it.isNotEmpty() }?.let(::parseHex)
-            val ansi = WINDOWS_TERMINAL_ANSI.map(::colour)
+
+            // isNull first: optString alone turns a JSON null into the text "null", which would then
+            // be refused as unreadable rather than as missing.
+            fun value(key: String) = if (json.isNull(key)) null else json.optString(key)
             return build(
                 name = json.optString("name").ifBlank { UNNAMED },
-                foreground = "foreground" to colour("foreground"),
-                background = "background" to colour("background"),
-                ansi = WINDOWS_TERMINAL_ANSI.zip(ansi),
-                cursor = colour("cursorColor"),
-                selection = colour("selectionBackground"),
+                foreground = "foreground" to value("foreground"),
+                background = "background" to value("background"),
+                ansi = WINDOWS_TERMINAL_ANSI.map { it to value(it) },
+                cursor = value("cursorColor"),
+                selection = value("selectionBackground"),
             )
         }
 
@@ -51,48 +56,55 @@ sealed interface ThemeImport {
          */
         private fun ghostty(text: String): ThemeImport {
             val values = mutableMapOf<String, String>()
-            val palette = arrayOfNulls<Int>(16)
+            val palette = arrayOfNulls<String>(16)
             text.lineSequence().map { it.trim() }.filter { it.isNotEmpty() && !it.startsWith("#") }.forEach { line ->
                 val key = line.substringBefore('=').trim()
                 val value = line.substringAfter('=', "").trim()
                 if (key == "palette") {
                     val index = value.substringBefore('=').trim().toIntOrNull()
-                    if (index != null && index in 0..15) palette[index] = parseHex(value.substringAfter('=', ""))
+                    if (index != null && index in 0..15) palette[index] = value.substringAfter('=', "")
                 } else {
                     values[key] = value
                 }
             }
             return build(
                 name = UNNAMED,
-                foreground = "foreground" to values["foreground"]?.let(::parseHex),
-                background = "background" to values["background"]?.let(::parseHex),
+                foreground = "foreground" to values["foreground"],
+                background = "background" to values["background"],
                 ansi = palette.mapIndexed { index, colour -> "palette $index" to colour },
-                cursor = values["cursor-color"]?.let(::parseHex),
-                selection = values["selection-background"]?.let(::parseHex),
+                cursor = values["cursor-color"],
+                selection = values["selection-background"],
             )
         }
 
+        /**
+         * Each colour as the text wrote it, paired with the text's own name for it. A required one
+         * that does not read is refused apart from one left out, so the message can say which; an
+         * optional one that does not read falls back as though it were left out.
+         */
         private fun build(
             name: String,
-            foreground: Pair<String, Int?>,
-            background: Pair<String, Int?>,
-            ansi: List<Pair<String, Int?>>,
-            cursor: Int?,
-            selection: Int?,
+            foreground: Pair<String, String?>,
+            background: Pair<String, String?>,
+            ansi: List<Pair<String, String?>>,
+            cursor: String?,
+            selection: String?,
         ): ThemeImport {
             val required = listOf(background, foreground) + ansi
-            val missing = required.filter { it.second == null }.map { it.first }
-            if (missing.isNotEmpty()) return Incomplete(missing)
-            val fg = foreground.second!!
-            val bg = background.second!!
+            val missing = required.filter { (_, text) -> text.isNullOrBlank() }.map { it.first }
+            val unreadable = required.filter { (_, text) -> !text.isNullOrBlank() && parseHex(text) == null }.map { it.first }
+            if (missing.isNotEmpty() || unreadable.isNotEmpty()) return Refused(missing, unreadable)
+            val colours = required.map { (_, text) -> parseHex(text!!)!! }
+            val bg = colours[0]
+            val fg = colours[1]
             return Read(
                 TerminalPalette(
                     name = name,
                     foreground = fg,
                     background = bg,
-                    cursor = cursor ?: fg,
-                    selection = selection ?: mix(bg, fg, SELECTION_MIX),
-                    ansi = IntArray(16) { ansi[it].second!! },
+                    cursor = cursor?.let(::parseHex) ?: fg,
+                    selection = selection?.let(::parseHex) ?: mix(bg, fg, SELECTION_MIX),
+                    ansi = IntArray(16) { colours[2 + it] },
                 ),
             )
         }
