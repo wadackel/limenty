@@ -105,7 +105,7 @@ internal fun ThemePicker(
                     choosingNew = false
                     when (val read = ThemeImport.parse(clipboardText(context))) {
                         is ThemeImport.Read -> importing = read.palette
-                        is ThemeImport.Incomplete -> importProblem = "The theme is missing ${read.missing.joinToString(", ")}."
+                        is ThemeImport.Refused -> importProblem = refusedImportMessage(read)
                         ThemeImport.Unrecognised -> importProblem = "Copy a Ghostty theme or a Windows Terminal color scheme, then try again."
                     }
                 })
@@ -195,4 +195,13 @@ private fun clipboardText(context: Context): String {
     val clipboard = context.getSystemService(ClipboardManager::class.java) ?: return ""
     val item = clipboard.primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0) ?: return ""
     return item.coerceToText(context)?.toString().orEmpty()
+}
+
+/** Names each colour that kept a pasted theme out, in the text's own key names, and what is wrong with it. */
+internal fun refusedImportMessage(refused: ThemeImport.Refused): String {
+    val missing = refused.missing.takeIf { it.isNotEmpty() }?.let { "The theme is missing ${it.joinToString(", ")}." }
+    val unreadable = refused.unreadable.takeIf { it.isNotEmpty() }?.let {
+        "${it.joinToString(", ")} ${if (it.size == 1) "needs" else "need"} six hex digits, like #7AA2F7."
+    }
+    return listOfNotNull(missing, unreadable).joinToString(" ")
 }
