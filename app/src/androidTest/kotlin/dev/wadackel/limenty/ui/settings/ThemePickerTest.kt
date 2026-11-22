@@ -1,5 +1,7 @@
 package dev.wadackel.limenty.ui.settings
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -20,6 +22,7 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import androidx.test.platform.app.InstrumentationRegistry
 import dev.wadackel.limenty.core.terminal.TerminalPalette
 import dev.wadackel.limenty.data.CustomTheme
 import dev.wadackel.limenty.data.TerminalPreferences
@@ -100,6 +103,7 @@ class ThemePickerTest {
 
         rule.onNodeWithText("New theme").performScrollTo().performClick()
         rule.waitForIdle()
+        press("Copy of Gruvbox Dark")
         press("Save")
 
         assertEquals(TerminalPalette.GruvboxDark.copy(name = "Gruvbox Dark copy"), preferences.customThemes.single().palette)
@@ -128,5 +132,51 @@ class ThemePickerTest {
 
         assertNull(preferences.themeOf(mine.id))
         assertEquals(TerminalPalette.Default, preferences.palette)
+    }
+
+    private fun copyToClipboard(text: String) {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        instrumentation.runOnMainSync {
+            instrumentation.targetContext.getSystemService(ClipboardManager::class.java)
+                .setPrimaryClip(ClipData.newPlainText("theme", text))
+        }
+    }
+
+    @Test
+    fun aSchemePastedFromTheClipboardIsAddedUnderItsOwnNameAndSelected() {
+        copyToClipboard(
+            """
+            {"name": "Paper", "background": "#F8F8F8", "foreground": "#202020",
+             "black": "#000000", "red": "#AA0000", "green": "#00AA00", "yellow": "#AA5500",
+             "blue": "#0000AA", "purple": "#AA00AA", "cyan": "#00AAAA", "white": "#AAAAAA",
+             "brightBlack": "#555555", "brightRed": "#FF5555", "brightGreen": "#55FF55", "brightYellow": "#FFFF55",
+             "brightBlue": "#5555FF", "brightPurple": "#FF55FF", "brightCyan": "#55FFFF", "brightWhite": "#FFFFFF"}
+            """.trimIndent(),
+        )
+        show(TerminalPreferences())
+
+        rule.onNodeWithText("New theme").performScrollTo().performClick()
+        rule.waitForIdle()
+        press("Paste from clipboard")
+        rule.onNode(hasSetTextAction() and hasText("Paper")).assertExists()
+        press("Save")
+
+        val imported = preferences.customThemes.single()
+        assertEquals("Paper", imported.name)
+        assertEquals(0xFFF8F8F8.toInt(), imported.palette.background)
+        assertEquals(imported.id, preferences.themeId)
+    }
+
+    @Test
+    fun clipboardTextThatIsNotAThemeAddsNothingAndSaysWhatToCopy() {
+        copyToClipboard("ssh ada@devbox")
+        show(TerminalPreferences())
+
+        rule.onNodeWithText("New theme").performScrollTo().performClick()
+        rule.waitForIdle()
+        press("Paste from clipboard")
+
+        rule.onNodeWithText("Copy a Ghostty theme or a Windows Terminal color scheme, then try again.").assertExists()
+        assertEquals(emptyList<CustomTheme>(), preferences.customThemes)
     }
 }
