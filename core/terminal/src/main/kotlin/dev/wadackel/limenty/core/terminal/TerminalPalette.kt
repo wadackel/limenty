@@ -151,7 +151,121 @@ data class TerminalPalette(
             ),
         )
 
-        val All = listOf(TokyoNight, Dracula, Nord, GruvboxDark, SolarizedDark, Dogrun)
+        val CatppuccinMocha = TerminalPalette(
+            name = "Catppuccin Mocha",
+            foreground = 0xFFCDD6F4.toInt(),
+            background = 0xFF1E1E2E.toInt(),
+            cursor = 0xFFF5E0DC.toInt(),
+            selection = 0xFF353749.toInt(),
+            ansi = intArrayOf(
+                0xFF45475A.toInt(), 0xFFF38BA8.toInt(), 0xFFA6E3A1.toInt(), 0xFFF9E2AF.toInt(),
+                0xFF89B4FA.toInt(), 0xFFF5C2E7.toInt(), 0xFF94E2D5.toInt(), 0xFFA6ADC8.toInt(),
+                0xFF585B70.toInt(), 0xFFF37799.toInt(), 0xFF89D88B.toInt(), 0xFFEBD391.toInt(),
+                0xFF74A8FC.toInt(), 0xFFF2AEDE.toInt(), 0xFF6BD7CA.toInt(), 0xFFBAC2DE.toInt(),
+            ),
+        )
+
+        val RosePine = TerminalPalette(
+            name = "Rosé Pine",
+            foreground = 0xFFE0DEF4.toInt(),
+            background = 0xFF191724.toInt(),
+            cursor = 0xFFE0DEF4.toInt(),
+            selection = 0xFF403D52.toInt(),
+            ansi = intArrayOf(
+                0xFF26233A.toInt(), 0xFFEB6F92.toInt(), 0xFF31748F.toInt(), 0xFFF6C177.toInt(),
+                0xFF9CCFD8.toInt(), 0xFFC4A7E7.toInt(), 0xFFEBBCBA.toInt(), 0xFFE0DEF4.toInt(),
+                0xFF6E6A86.toInt(), 0xFFEB6F92.toInt(), 0xFF31748F.toInt(), 0xFFF6C177.toInt(),
+                0xFF9CCFD8.toInt(), 0xFFC4A7E7.toInt(), 0xFFEBBCBA.toInt(), 0xFFE0DEF4.toInt(),
+            ),
+        )
+
+        val KanagawaWave = TerminalPalette(
+            name = "Kanagawa Wave",
+            foreground = 0xFFDCD7BA.toInt(),
+            background = 0xFF1F1F28.toInt(),
+            cursor = 0xFFC8C093.toInt(),
+            selection = 0xFF2D4F67.toInt(),
+            ansi = intArrayOf(
+                0xFF16161D.toInt(), 0xFFC34043.toInt(), 0xFF76946A.toInt(), 0xFFC0A36E.toInt(),
+                0xFF7E9CD8.toInt(), 0xFF957FB8.toInt(), 0xFF6A9589.toInt(), 0xFFC8C093.toInt(),
+                0xFF727169.toInt(), 0xFFE82424.toInt(), 0xFF98BB6C.toInt(), 0xFFE6C384.toInt(),
+                0xFF7FB4CA.toInt(), 0xFF938AA9.toInt(), 0xFF7AA89F.toInt(), 0xFFDCD7BA.toInt(),
+            ),
+        )
+
+        /**
+         * Everforest publishes no terminal port, so the sixteen are the ones its Vim colorscheme
+         * hands to Vim's own terminal (`g:terminal_ansi_colors`, dark, medium contrast), which is
+         * the scheme's answer to the same question. That mapping repeats the normal colours as
+         * the bright ones, and it is kept rather than brightened here.
+         */
+        val EverforestDark = TerminalPalette(
+            name = "Everforest Dark",
+            foreground = 0xFFD3C6AA.toInt(),
+            background = 0xFF2D353B.toInt(),
+            cursor = 0xFFD3C6AA.toInt(),
+            selection = 0xFF543A48.toInt(),
+            ansi = intArrayOf(
+                0xFF475258.toInt(), 0xFFE67E80.toInt(), 0xFFA7C080.toInt(), 0xFFDBBC7F.toInt(),
+                0xFF7FBBB3.toInt(), 0xFFD699B6.toInt(), 0xFF83C092.toInt(), 0xFFD3C6AA.toInt(),
+                0xFF475258.toInt(), 0xFFE67E80.toInt(), 0xFFA7C080.toInt(), 0xFFDBBC7F.toInt(),
+                0xFF7FBBB3.toInt(), 0xFFD699B6.toInt(), 0xFF83C092.toInt(), 0xFFD3C6AA.toInt(),
+            ),
+        )
+
+        val OneDark = TerminalPalette(
+            name = "One Dark",
+            foreground = 0xFFABB2BF.toInt(),
+            background = 0xFF282C34.toInt(),
+            cursor = 0xFFABB2BF.toInt(),
+            selection = 0xFF5C6370.toInt(),
+            ansi = intArrayOf(
+                0xFF2C323C.toInt(), 0xFFE06C75.toInt(), 0xFF98C379.toInt(), 0xFFE5C07B.toInt(),
+                0xFF61AFEF.toInt(), 0xFFC678DD.toInt(), 0xFF56B6C2.toInt(), 0xFF5C6370.toInt(),
+                0xFF3E4452.toInt(), 0xFFE06C75.toInt(), 0xFF98C379.toInt(), 0xFFE5C07B.toInt(),
+                0xFF61AFEF.toInt(), 0xFFC678DD.toInt(), 0xFF56B6C2.toInt(), 0xFFABB2BF.toInt(),
+            ),
+        )
+
+        /**
+         * From the integrated-terminal colours of the scheme's own VS Code theme. Its selection
+         * there is translucent, which a palette cannot hold, so the editor's opaque selection
+         * stands in for it.
+         */
+        val NightOwl = TerminalPalette(
+            name = "Night Owl",
+            foreground = 0xFFD6DEEB.toInt(),
+            background = 0xFF011627.toInt(),
+            cursor = 0xFF80A4C2.toInt(),
+            selection = 0xFF1D3B53.toInt(),
+            ansi = intArrayOf(
+                0xFF011627.toInt(), 0xFFEF5350.toInt(), 0xFF22DA6E.toInt(), 0xFFC5E478.toInt(),
+                0xFF82AAFF.toInt(), 0xFFC792EA.toInt(), 0xFF21C7A8.toInt(), 0xFFFFFFFF.toInt(),
+                0xFF575656.toInt(), 0xFFEF5350.toInt(), 0xFF22DA6E.toInt(), 0xFFFFEB95.toInt(),
+                0xFF82AAFF.toInt(), 0xFFC792EA.toInt(), 0xFF7FDBCA.toInt(), 0xFFFFFFFF.toInt(),
+            ),
+        )
+
+        /** The sixteen Iceberg gives Vim's own terminal (`g:terminal_ansi_colors`, dark). */
+        val Iceberg = TerminalPalette(
+            name = "Iceberg",
+            foreground = 0xFFC6C8D1.toInt(),
+            background = 0xFF161821.toInt(),
+            cursor = 0xFFC6C8D1.toInt(),
+            selection = 0xFF272C42.toInt(),
+            ansi = intArrayOf(
+                0xFF1E2132.toInt(), 0xFFE27878.toInt(), 0xFFB4BE82.toInt(), 0xFFE2A478.toInt(),
+                0xFF84A0C6.toInt(), 0xFFA093C7.toInt(), 0xFF89B8C2.toInt(), 0xFFC6C8D1.toInt(),
+                0xFF6B7089.toInt(), 0xFFE98989.toInt(), 0xFFC0CA8E.toInt(), 0xFFE9B189.toInt(),
+                0xFF91ACD1.toInt(), 0xFFADA0D3.toInt(), 0xFF95C4CE.toInt(), 0xFFD2D4DE.toInt(),
+            ),
+        )
+
+        /** Alphabetical, ignoring case, so dogrun sits under D and the default is not singled out. */
+        val All = listOf(
+            TokyoNight, Dracula, Nord, GruvboxDark, SolarizedDark, Dogrun,
+            CatppuccinMocha, RosePine, KanagawaWave, EverforestDark, OneDark, NightOwl, Iceberg,
+        ).sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.name })
 
         val Default = TokyoNight
     }

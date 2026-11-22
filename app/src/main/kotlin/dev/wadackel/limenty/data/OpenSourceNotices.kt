@@ -58,6 +58,10 @@ internal val BundledFonts = listOf(
     BundledFont("JetBrains Mono", "OFL-1.1", "licenses/JetBrainsMono-OFL.txt"),
     BundledFont("Fira Code", "OFL-1.1", "licenses/FiraCode-OFL.txt"),
     BundledFont("Hack", "MIT + Bitstream Vera", "licenses/Hack-LICENSE.md"),
+    BundledFont("Source Code Pro", "OFL-1.1", "licenses/SourceCodePro-OFL.md"),
+    BundledFont("IBM Plex Mono", "OFL-1.1", "licenses/IBMPlexMono-OFL.txt"),
+    BundledFont("Cascadia Mono", "OFL-1.1", "licenses/CascadiaMono-OFL.txt"),
+    BundledFont("Inconsolata", "OFL-1.1", "licenses/Inconsolata-OFL.txt"),
     BundledFont("Symbols Nerd Font Mono", "MIT", "licenses/SymbolsNerdFont-LICENSE.txt"),
 )
 

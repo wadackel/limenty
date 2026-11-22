@@ -5,6 +5,7 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
 import com.google.common.truth.Truth.assertWithMessage
+import dev.wadackel.limenty.core.terminal.TerminalFont
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -100,6 +101,15 @@ class OpenSourceNoticesTest {
             "THE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR " +
                 "IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY IN THE SOFTWARE.",
         )
+    }
+
+    @Test
+    fun `every font the terminal offers has its licence on the About screen`() {
+        val listed = BundledFonts.map { it.name }
+
+        TerminalFont.All.forEach { font ->
+            assertWithMessage(font.displayName).that(listed).contains(font.displayName)
+        }
     }
 
     /**

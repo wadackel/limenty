@@ -96,8 +96,10 @@ The details are in [`docs/security.md`](docs/security.md).
 
 ### Looks
 
-Tokyo Night, Dracula, Nord, Gruvbox Dark, Solarized Dark and dogrun; JetBrains Mono, Fira Code
-and Hack; font size, line height and letter spacing are adjustable and apply as you drag.
+Thirteen dark themes: Catppuccin Mocha, dogrun, Dracula, Everforest Dark, Gruvbox Dark, Iceberg,
+Kanagawa Wave, Night Owl, Nord, One Dark, Rosé Pine, Solarized Dark and Tokyo Night. Seven fonts:
+Cascadia Mono, Fira Code, Hack, IBM Plex Mono, Inconsolata, JetBrains Mono and Source Code Pro.
+Font size, line height and letter spacing are adjustable and apply as you drag.
 
 ## Limitations
 

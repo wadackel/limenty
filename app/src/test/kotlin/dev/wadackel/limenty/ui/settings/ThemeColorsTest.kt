@@ -1,6 +1,9 @@
 package dev.wadackel.limenty.ui.settings
 
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import dev.wadackel.limenty.core.terminal.TerminalPalette
+import dev.wadackel.limenty.ui.theme.LimentyColors
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -13,6 +16,15 @@ class ThemeColorsTest {
                 val argb = palette.colorOf(color)
                 assertEquals("${palette.name} ${color.label}", argb, Oklch.of(argb).toArgb())
             }
+        }
+    }
+
+    /** `docs/design.md`: the chrome sits behind the terminal whichever preset is showing. */
+    @Test
+    fun `every preset's background is lighter than the app's own background`() {
+        val chrome = LimentyColors.Bg.luminance()
+        TerminalPalette.All.forEach { palette ->
+            assertTrue(palette.name, Color(palette.background).luminance() > chrome)
         }
     }
 
