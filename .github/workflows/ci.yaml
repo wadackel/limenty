@@ -56,6 +56,9 @@ jobs:
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
+      - name: Use Google's mirror of Maven Central
+        run: install -D -t ~/.gradle/init.d .github/gradle/maven-central-mirror.init.gradle.kts
+
       # The Android SDK comes from the runner image, which sets ANDROID_HOME; the flake's
       # shellHook takes it rather than overriding it.
       #
@@ -99,6 +102,9 @@ jobs:
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
+      - name: Use Google's mirror of Maven Central
+        run: install -D -t ~/.gradle/init.d .github/gradle/maven-central-mirror.init.gradle.kts
+
       - name: Android Lint
         run: nix develop -c ./gradlew :app:lintDebug
 
@@ -129,6 +135,9 @@ jobs:
       - uses: gradle/actions/setup-gradle@v6.4.1
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+
+      - name: Use Google's mirror of Maven Central
+        run: install -D -t ~/.gradle/init.d .github/gradle/maven-central-mirror.init.gradle.kts
 
       # For SshOnAndroidTest's end-to-end case. Started without waiting for it to listen: the build
       # and the emulator boot that come first take minutes, and with sshHost given the test fails
