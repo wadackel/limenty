@@ -11,10 +11,16 @@ APK=app/build/outputs/apk/debug/app-debug.apk
 # Which device these act on. An emulator is usually attached alongside the phone, and once the
 # phone is on the network it is attached even when it is in another room — so bare adb, which
 # refuses outright when there is more than one, refuses most of the time. Name one instead of
-# letting the choice fall to whichever came first.
+# letting the choice fall to whichever came first. LIMENTY_AVD names an emulator by its AVD,
+# which stays the same when its serial changes with start order.
 attached() { "$ADB" devices | awk '$2=="device"{print $1}'; }
 target() {
   if [ -n "${ANDROID_SERIAL:-}" ]; then echo "$ANDROID_SERIAL"; return; fi
+  if [ -n "${LIMENTY_AVD:-}" ]; then
+    avd_serial "$LIMENTY_AVD" && return
+    echo "tools/app: no emulator is running $LIMENTY_AVD (LIMENTY_AVD=$LIMENTY_AVD tools/emu start)" >&2
+    return 2
+  fi
   local all count
   all=$(attached); count=$(echo "$all" | grep -c .)
   if [ "$count" = 1 ]; then echo "$all"; return; fi
@@ -22,6 +28,7 @@ target() {
     if [ "$count" = 0 ]; then echo "tools/app: nothing attached"
     else echo "tools/app: several devices attached, so pick one:"; echo "$all" | sed 's/^/  /'; fi
     echo "  ANDROID_SERIAL=<serial> tools/app $*"
+    echo "  LIMENTY_AVD=<avd> tools/app $*"
   } >&2
   return 2
 }
@@ -57,8 +64,9 @@ case "${1:-}" in
   # Instrumentation reinstalls the app, and reinstalling wipes its data — the saved hosts and
   # their credentials with it. That is a nuisance on an emulator and a real loss on the phone
   # someone actually uses, so the target has to be an emulator unless the caller insists.
-  itest)   target="${ANDROID_SERIAL:-$(attached | awk '/^emulator-/ {print; exit}')}"
-           target="${target:-$(attached | head -1)}"
+  itest)   if [ -n "${ANDROID_SERIAL:-}${LIMENTY_AVD:-}" ]; then target=$(target itest) || exit 2
+           else target=$(attached | awk '/^emulator-/ {print; exit}'); target="${target:-$(attached | head -1)}"
+           fi
            if [ -z "$target" ]; then
              echo "tools/app itest: no device attached" >&2; exit 2
            fi
@@ -67,7 +75,7 @@ case "${1:-}" in
              *) if [ "${LIMENTY_ITEST_ALLOW_DEVICE:-}" != "1" ]; then
                   echo "tools/app itest: refusing to run on '$target' — this reinstalls the app" >&2
                   echo "  and wipes its saved hosts and credentials. Start an emulator" >&2
-                  echo "  (tools/emu start) or set ANDROID_SERIAL to one." >&2
+                  echo "  (tools/emu start) or set ANDROID_SERIAL or LIMENTY_AVD to one." >&2
                   echo "  To override anyway: LIMENTY_ITEST_ALLOW_DEVICE=1 tools/app itest" >&2
                   exit 2
                 fi ;;
