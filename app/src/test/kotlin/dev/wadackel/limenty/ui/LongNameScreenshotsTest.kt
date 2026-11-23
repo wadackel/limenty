@@ -243,7 +243,7 @@ class LongNameScreenshotsTest {
         /** Relative to the module, which is where Gradle runs unit tests from. */
         const val IMAGES = "src/test/screenshots/long-names"
 
-        /** The names #15 and #20 were filed with: one with spaces to wrap at, one with none. */
+        /** The names two earlier bugs were found with: one with spaces to wrap at, one with none. */
         const val LONG_THEME_NAME = "Averyveryveryverylongthemename and then some more words that keep going on and on " +
             "until the dialog title and the card label must wrap or clip somewhere 1234567890"
         const val LONG_SET_NAME = "A-very-long-key-set-name-that-has-no-spaces-and-goes-on-for-a-long-while-until-the-screen-is-exceeded-1234567890"
