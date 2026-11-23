@@ -92,6 +92,13 @@ jobs:
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
+      # For SshOnAndroidTest's end-to-end case. Started without waiting for it to listen: the build
+      # and the emulator boot that come first take minutes, and with sshHost given the test fails
+      # rather than skips when nothing answers, so a server that never came up still shows. The
+      # password is fixed because the runner is a throwaway machine nothing else reaches.
+      - name: Test SSH server
+        run: nohup tools/sshd --port 2222 --password testpass > "$RUNNER_TEMP/sshd.log" 2>&1 &
+
       # The runner has /dev/kvm but only root may open it; without it the emulator falls back to
       # software emulation, too slow to boot inside the timeout.
       - name: Enable KVM
@@ -100,19 +107,6 @@ jobs:
             | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
-
-      # For SshOnAndroidTest's end-to-end case, which skips without a server. The password is
-      # fixed because the runner is a throwaway machine nothing else reaches; tools/sshd itself
-      # picks a random one for a reason that holds on a developer's machine.
-      - name: Test SSH server
-        run: |
-          nohup tools/sshd --port 2222 --password testpass > "$RUNNER_TEMP/sshd.log" 2>&1 &
-          for _ in $(seq 120); do
-            if (exec 3<>/dev/tcp/127.0.0.1/2222) 2>/dev/null; then exit 0; fi
-            sleep 1
-          done
-          cat "$RUNNER_TEMP/sshd.log"
-          exit 1
 
       # A Gradle-managed emulator (`ci` in app/build.gradle.kts): Gradle downloads the image,
       # boots it, runs the suite and shuts it down, so there is no emulator action to pin.
