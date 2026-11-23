@@ -3,6 +3,7 @@ package dev.wadackel.limenty.ui.terminal
 import android.graphics.Bitmap
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
@@ -11,8 +12,10 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
@@ -20,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.wadackel.limenty.core.input.TerminalKey
 import dev.wadackel.limenty.data.AuxiliaryKey
+import dev.wadackel.limenty.ui.AtSize
 import dev.wadackel.limenty.ui.theme.LimentyColors
 import org.junit.Rule
 import org.junit.Test
@@ -35,20 +39,19 @@ class AuxiliaryKeyBarCaptureTest {
 
     private fun capture(name: String, widthDp: Int) {
         rule.setContent {
-            Box(
-                modifier = Modifier
-                    .width(widthDp.dp)
-                    .background(Color(0xFF1A1B26)),
-            ) {
-                AuxiliaryKeyBar(
-                    keys = AuxiliaryKey.DefaultScrolling,
-                    pinnedKeys = AuxiliaryKey.DefaultPinned,
-                    onKeyPressed = {},
-                )
+            AtSize(widthDp.dp) {
+                Box(modifier = Modifier.fillMaxWidth().background(Color(0xFF1A1B26)).testTag(BAR)) {
+                    AuxiliaryKeyBar(
+                        keys = AuxiliaryKey.DefaultScrolling,
+                        pinnedKeys = AuxiliaryKey.DefaultPinned,
+                        onKeyPressed = {},
+                    )
+                }
             }
         }
         rule.waitForIdle()
-        val image = rule.onRoot().captureToImage().asAndroidBitmap()
+        // The bar rather than the root, which AtSize makes as tall as the display.
+        val image = rule.onNodeWithTag(BAR).captureToImage().asAndroidBitmap()
         val dir = File(
             InstrumentationRegistry.getInstrumentation().targetContext.filesDir,
             "captures",
@@ -310,6 +313,8 @@ class AuxiliaryKeyBarCaptureTest {
 }
 
 private const val COVER_WIDTH_DP = 460
+
+private const val BAR = "bar"
 
 /** The largest the platform's accessibility settings go, where any height drift is widest. */
 private const val MAX_FONT_SCALE = 2.0f

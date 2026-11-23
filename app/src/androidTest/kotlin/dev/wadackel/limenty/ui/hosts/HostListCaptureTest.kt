@@ -2,14 +2,10 @@ package dev.wadackel.limenty.ui.hosts
 
 import android.content.Context
 import android.graphics.Bitmap
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -24,6 +20,7 @@ import dev.wadackel.limenty.core.terminal.TerminalPalette
 import dev.wadackel.limenty.data.HostProfile
 import dev.wadackel.limenty.data.LanService
 import dev.wadackel.limenty.terminal.TerminalTypefaces
+import dev.wadackel.limenty.ui.AtSize
 import dev.wadackel.limenty.ui.theme.LimentyTheme
 import org.junit.Rule
 import org.junit.Test
@@ -67,7 +64,7 @@ class HostListCaptureTest {
         rule.setContent {
             var selected by remember { mutableStateOf<String?>(null) }
             LimentyTheme {
-                Box(modifier = Modifier.width(widthDp.dp).height(heightDp.dp)) {
+                AtSize(widthDp.dp, heightDp.dp) {
                     HostListScreen(
                         hosts = listOf(connected, idle),
                         statusOf = { if (it.id == "a") HostStatus.Connected else HostStatus.Disconnected },

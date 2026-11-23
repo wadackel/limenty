@@ -2,9 +2,6 @@ package dev.wadackel.limenty.ui.settings
 
 import android.content.Context
 import android.graphics.Bitmap
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.width
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -14,6 +11,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.wadackel.limenty.data.TerminalPreferences
 import dev.wadackel.limenty.terminal.TerminalTypefaces
+import dev.wadackel.limenty.ui.AtSize
 import dev.wadackel.limenty.ui.theme.LimentyTheme
 import org.junit.Rule
 import org.junit.Test
@@ -28,7 +26,7 @@ class SettingsCaptureTest {
         val context = ApplicationProvider.getApplicationContext<Context>()
         rule.setContent {
             LimentyTheme {
-                Box(modifier = Modifier.width(widthDp.dp)) {
+                AtSize(widthDp.dp) {
                     SettingsScreen(
                         preferences = TerminalPreferences(),
                         typefaces = TerminalTypefaces(context),
