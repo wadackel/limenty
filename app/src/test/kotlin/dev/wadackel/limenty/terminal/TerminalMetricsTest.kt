@@ -1,18 +1,22 @@
 package dev.wadackel.limenty.terminal
 
 import android.graphics.Paint
-import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import dev.wadackel.limenty.core.terminal.TerminalTypography
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 /**
  * The renderer and the measurement share one [Paint], so measuring has to state the state it
  * depends on. A pinch zoom re-measures through a paint the renderer last used, and inheriting the
  * spacing from it would widen every cell a little more on each gesture.
  */
-@RunWith(AndroidJUnit4::class)
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [35], qualifiers = "w673dp-h841dp-420dpi")
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 class TerminalMetricsTest {
     private val typography = TerminalTypography(letterSpacingSp = 1.5f)
 

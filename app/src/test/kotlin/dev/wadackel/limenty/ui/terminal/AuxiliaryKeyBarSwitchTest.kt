@@ -19,6 +19,10 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Rule
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 /**
  * Switching key sets by swiping the bar up or down, measured by touching it.
@@ -27,6 +31,9 @@ import org.junit.Test
  * key, so a swipe that also pressed the key under the thumb would send a stray Escape on every
  * switch.
  */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [35], qualifiers = "w673dp-h841dp-420dpi")
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 class AuxiliaryKeyBarSwitchTest {
     @get:Rule
     val rule = createComposeRule()

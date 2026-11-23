@@ -16,6 +16,10 @@ import com.google.common.truth.Truth.assertThat
 import dev.wadackel.limenty.ui.theme.LimentyTheme
 import org.junit.Rule
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 /**
  * A slider has to answer a drag, which a screenshot cannot tell you.
@@ -24,6 +28,9 @@ import org.junit.Test
  * handler was created, so the thumb moved by one event's worth of travel and then stopped no
  * matter how far the finger went — invisible to a still image, and the reason this test exists.
  */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [35], qualifiers = "w673dp-h841dp-420dpi")
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 class SliderInteractionTest {
     @get:Rule
     val rule = createComposeRule()

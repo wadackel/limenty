@@ -25,8 +25,15 @@ import dev.wadackel.limenty.terminal.TerminalTypefaces
 import dev.wadackel.limenty.ui.theme.LimentyTheme
 import org.junit.Rule
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 /** The list and detail layout of the host list on the unfolded display. */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [35], qualifiers = "w673dp-h841dp-420dpi")
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 class HostDetailPaneTest {
     @get:Rule
     val rule = createComposeRule()

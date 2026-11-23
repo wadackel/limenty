@@ -1,14 +1,16 @@
 package dev.wadackel.limenty.input
 
+import android.app.Application
 import android.view.View
 import androidx.test.core.app.ApplicationProvider
-import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.google.common.truth.Truth.assertThat
 import dev.wadackel.limenty.core.input.ImeEditBuffer
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
 /**
  * When the terminal says where its cursor and composing region are.
@@ -18,7 +20,8 @@ import org.junit.runner.RunWith
  * blind. Saying it mid-batch describes a state the IME is half way through setting, which Gboard
  * reads as the composition being taken from it.
  */
-@RunWith(AndroidJUnit4::class)
+@RunWith(RobolectricTestRunner::class)
+@Config(application = Application::class, sdk = [35])
 class ImeSelectionReportTest {
     private lateinit var view: View
     private val buffer = ImeEditBuffer()

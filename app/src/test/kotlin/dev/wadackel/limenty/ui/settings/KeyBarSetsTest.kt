@@ -25,8 +25,15 @@ import dev.wadackel.limenty.ui.theme.LimentyTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 /** Making, naming and removing key sets on the Key bar screen, driven through the screen itself. */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [35], qualifiers = "w673dp-h841dp-420dpi")
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 class KeyBarSetsTest {
     @get:Rule
     val rule = createComposeRule()

@@ -1,10 +1,6 @@
 package dev.wadackel.limenty.ui.settings
 
 import android.graphics.Bitmap
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.width
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -14,6 +10,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import dev.wadackel.limenty.data.AuxiliaryKey
 import dev.wadackel.limenty.data.KeySet
 import dev.wadackel.limenty.data.TerminalPreferences
+import dev.wadackel.limenty.ui.AtSize
 import dev.wadackel.limenty.ui.theme.LimentyTheme
 import org.junit.Rule
 import org.junit.Test
@@ -28,7 +25,7 @@ class KeyBarSettingsCaptureTest {
     fun coverWidth() {
         rule.setContent {
             LimentyTheme {
-                Box(modifier = Modifier.width(460.dp).height(900.dp)) {
+                AtSize(460.dp, 900.dp) {
                     KeyBarSettingsScreen(
                         preferences = TerminalPreferences(
                             keySets = listOf(

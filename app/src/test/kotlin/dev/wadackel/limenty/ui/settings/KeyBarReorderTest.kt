@@ -26,6 +26,10 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Rule
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 /**
  * Reordering by dragging, driven as a finger drives it.
@@ -33,6 +37,9 @@ import org.junit.Test
  * The gesture is the feature here, so it is exercised rather than the list function underneath it —
  * a reorder that computes the right answer but never fires is the failure worth catching.
  */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [35], qualifiers = "w673dp-h841dp-420dpi")
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 class KeyBarReorderTest {
     @get:Rule
     val rule = createComposeRule()

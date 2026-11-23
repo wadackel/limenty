@@ -28,6 +28,10 @@ import dev.wadackel.limenty.ui.settings.SettingsScreen
 import dev.wadackel.limenty.ui.theme.LimentyTheme
 import org.junit.Rule
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 /**
  * The word at the end of a header is a button, on every screen that has one.
@@ -37,6 +41,9 @@ import org.junit.Test
  * it opened that had neither problem. Nothing about that is visible in a screenshot — the reach
  * around a word and the shape its press takes are both measurements — so they are asserted here.
  */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [35], qualifiers = "w673dp-h841dp-420dpi")
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 class HeaderActionTest {
     @get:Rule
     val rule = createComposeRule()

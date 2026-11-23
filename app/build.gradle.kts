@@ -73,6 +73,18 @@ android {
             isIncludeAndroidResources = true
             isReturnDefaultValues = true
         }
+        // The emulator CI's instrumentation job runs on: `./gw :app:ciDebugAndroidTest`. The same
+        // profile as `tools/emu create`, so a test that passes on the AVD people iterate on meets
+        // the same display in CI; the ATD image because it boots in about half the time.
+        managedDevices {
+            localDevices {
+                create("ci") {
+                    device = "7.6\" Fold-in with outer display"
+                    apiLevel = 36
+                    systemImageSource = "aosp-atd"
+                }
+            }
+        }
     }
 }
 

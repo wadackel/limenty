@@ -23,6 +23,10 @@ import dev.wadackel.limenty.ui.theme.LimentyTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 /**
  * A key names itself after what it sends, until someone names it something else.
@@ -30,6 +34,9 @@ import org.junit.Test
  * Almost no key wants a name of its own, and the editor used to insist on one: picking an action
  * left the label exactly as it was, so every key had to be typed out by hand.
  */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [35], qualifiers = "w673dp-h841dp-420dpi")
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 class KeyLabelTest {
     @get:Rule
     val rule = createComposeRule()

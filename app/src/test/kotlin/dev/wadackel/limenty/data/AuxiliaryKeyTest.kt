@@ -1,19 +1,22 @@
 package dev.wadackel.limenty.data
 
-import androidx.test.ext.junit.runners.AndroidJUnit4
+import android.app.Application
 import com.google.common.truth.Truth.assertThat
 import dev.wadackel.limenty.core.input.Modifiers
 import dev.wadackel.limenty.core.input.TerminalInputEvent
 import dev.wadackel.limenty.core.input.TerminalKey
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
 /**
  * The bar is configurable and its layout outlives the process, so what a button sends
- * has to survive being written down and read back. Runs on a device for `org.json`, whose stubs
- * throw on the JVM.
+ * has to survive being written down and read back. Runs under Robolectric for `org.json`, whose
+ * stubs throw on a plain JVM.
  */
-@RunWith(AndroidJUnit4::class)
+@RunWith(RobolectricTestRunner::class)
+@Config(application = Application::class, sdk = [35])
 class AuxiliaryKeyTest {
     @Test
     fun theDefaultBarSurvivesARoundTrip() {
