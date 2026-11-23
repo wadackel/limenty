@@ -23,19 +23,13 @@ internal object KeyStepJson {
 
     fun encodeAll(steps: List<KeyStep>): JSONArray = JSONArray().also { array -> steps.forEach { array.put(encode(it)) } }
 
-    /**
-     * Throws on a key this build does not know, or a code point no character has, so the caller
-     * decides what an unreadable step costs. Read as it stands, such a code point would only fail
-     * later, each time the step is drawn or sent.
-     */
+    /** Throws on a key this build does not know, so the caller decides what an unreadable step costs. */
     fun decode(item: JSONObject): KeyStep {
         if (item.has("text")) return KeyStep.Literal(item.getString("text"))
-        val codePoint = item.optInt("codePoint")
-        require(codePoint == 0 || Character.isValidCodePoint(codePoint)) { "not a code point" }
         return KeyStep.Press(
             key = item.optString("key").takeIf { it.isNotEmpty() && it != "null" }
                 ?.let(TerminalKey::valueOf),
-            codePoint = codePoint,
+            codePoint = item.optInt("codePoint"),
             modifiers = Modifiers(item.optInt("modifiers")),
         )
     }

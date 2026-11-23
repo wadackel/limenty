@@ -115,11 +115,12 @@ sealed interface GestureBehaviour {
         }
 
         /**
-         * The behaviour an id names: one of the fixed behaviours, or a key stored under the
-         * single-key ids written before a gesture could send several steps.
+         * The behaviour an id names: one of the fixed behaviours, or a single key stored as
+         * `key:Tab:0` or `chord:99:4`.
          *
-         * Those ids, `key:Tab:0` and `chord:99:4`, are what the owner's phone holds, and reading
-         * them as nothing would quietly unbind the gestures configured with them.
+         * Those are the ids earlier versions wrote, and the owner's phone holds them. A single key
+         * is still written this way, so that an earlier version installed over this one reads its
+         * presets rather than nothing.
          */
         fun byId(id: String): GestureBehaviour = Assignable.firstOrNull { it !is SendKeys && it.id == id }
             ?: singleKey(id)

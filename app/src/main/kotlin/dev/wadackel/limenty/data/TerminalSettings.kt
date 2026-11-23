@@ -272,9 +272,9 @@ class TerminalSettings(context: Context, private val scope: CoroutineScope) {
     }
 
     /**
-     * Stored as gesture-to-behaviour ids, or as the steps themselves for a gesture that sends keys.
-     * An entry that cannot be read falls back to None rather than failing the whole read, so a
-     * binding removed in a later version cannot strand the other settings.
+     * Stored as gesture-to-behaviour ids, or as the steps themselves for keys longer than one (see
+     * [encodeGesture]). An entry that cannot be read falls back to None rather than failing the
+     * whole read, so a binding removed in a later version cannot strand the other settings.
      */
     private fun readGestures(): GestureBindings? {
         val encoded = preferences.getString(KEY_GESTURES, null) ?: return null
@@ -291,13 +291,19 @@ class TerminalSettings(context: Context, private val scope: CoroutineScope) {
     }
 
     private fun decodeGesture(stored: Any): GestureBehaviour = when (stored) {
-        is JSONArray -> runCatching { GestureBehaviour.SendKeys(KeyStepJson.decodeAll(stored)) }
+        // The code point is checked here rather than in KeyStepJson, which the key bar shares: the
+        // bar discards every set for one unreadable step, a far larger loss than the one key.
+        is JSONArray -> runCatching { KeyStepJson.decodeAll(stored) }
             .getOrNull()
-            ?.takeIf { it.steps.isNotEmpty() }
+            ?.takeIf { steps -> steps.isNotEmpty() && steps.all(::isCharacterOrKey) }
+            ?.let(GestureBehaviour::SendKeys)
             ?: GestureBehaviour.None
         is String -> GestureBehaviour.byId(stored)
         else -> GestureBehaviour.None
     }
+
+    /** Read as it stands, a code point no character has would fail each time the step is drawn or sent. */
+    private fun isCharacterOrKey(step: KeyStep): Boolean = step !is KeyStep.Press || step.codePoint == 0 || Character.isValidCodePoint(step.codePoint)
 
     private fun encodeGestures(bindings: GestureBindings): String {
         val json = JSONObject()
