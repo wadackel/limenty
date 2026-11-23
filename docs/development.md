@@ -79,7 +79,7 @@ CI runs the whole suite as well, on every pull request and push to `main`, in th
 `instrumentation` job beside `check`. It boots a Gradle-managed emulator (`ci` in
 `app/build.gradle.kts`, the same `7.6in Foldable` profile as `tools/emu create`, on an ATD image),
 starts `tools/sshd` so `SshOnAndroidTest` connects rather than skips, and keeps the reports when it
-fails. It takes about seven minutes, so `tools/app itest` on one class is still the faster loop.
+fails. It takes about three minutes, so `tools/app itest` on one class is still the faster loop.
 
 A test belongs in `androidTest` only when what it checks is the platform's own behaviour, which
 Robolectric stands in for with a shadow or a host build: the Android Keystore, the key character
