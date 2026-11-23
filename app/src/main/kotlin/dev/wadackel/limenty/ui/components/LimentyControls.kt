@@ -39,6 +39,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.offset
 import androidx.compose.ui.unit.sp
 import dev.wadackel.limenty.ui.theme.LimentyColors
 import dev.wadackel.limenty.ui.theme.LimentyShapes
@@ -339,10 +340,14 @@ val LimentyTextButtonInset = 12.dp
  *
  * For a 44dp target set into a line of text: the line keeps its own height rather than growing to
  * the target's, and the target still answers over the whole 44dp.
+ *
+ * The content is offered the trimmed height back. Measured within the line's own height instead, a
+ * line whose height is fixed (a row sized by its intrinsics) squeezes the target down to the line,
+ * and it then answers over the line's height rather than 44dp.
  */
 fun Modifier.overhangVertically(amount: Dp) = layout { measurable, constraints ->
-    val placeable = measurable.measure(constraints)
     val trim = amount.roundToPx()
+    val placeable = measurable.measure(constraints.offset(vertical = 2 * trim))
     layout(placeable.width, (placeable.height - 2 * trim).coerceAtLeast(0)) {
         placeable.place(0, -trim)
     }
