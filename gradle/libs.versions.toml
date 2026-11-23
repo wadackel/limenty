@@ -18,6 +18,9 @@ androidxTestJunit = "1.3.0"
 androidxTestCore = "1.7.0"
 espresso = "3.7.0"
 robolectric = "4.14.1"
+# The Android jar Robolectric 4.14.1 runs SDK 35 on, the only SDK the tests ask for. Bumping
+# Robolectric changes it: an offline run names the file it could not find.
+robolectricAndroidAll = "15-robolectric-12650502-i7"
 truth = "1.4.4"
 aboutLibraries = "15.3.0"
 roborazzi = "1.79.0"
@@ -59,6 +62,7 @@ compose-material-icons-extended = { module = "androidx.compose.material:material
 junit = { module = "junit:junit", version.ref = "junit" }
 truth = { module = "com.google.truth:truth", version.ref = "truth" }
 robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
+robolectric-android-all = { module = "org.robolectric:android-all-instrumented", version.ref = "robolectricAndroidAll" }
 androidx-test-core = { module = "androidx.test:core", version.ref = "androidxTestCore" }
 androidx-test-runner = { module = "androidx.test:runner", version.ref = "androidxTestCore" }
 androidx-test-rules = { module = "androidx.test:rules", version.ref = "androidxTestCore" }
