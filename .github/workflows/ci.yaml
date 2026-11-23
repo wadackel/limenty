@@ -155,9 +155,8 @@ jobs:
 
       - name: Fingerprint the restored snapshot
         run: echo "SNAPSHOT_BEFORE=$(cat ~/.config/.android/avd/gradle-managed/*.avd/snapshots/default_boot/snapshot.pb 2>/dev/null | sha256sum)" >> "$GITHUB_ENV"
-      - name: Break the restored snapshot (experiment)
-        if: github.run_attempt == 2
-        run: truncate -s 1M ~/.config/.android/avd/gradle-managed/*.avd/snapshots/default_boot/ram.bin && ls -la ~/.config/.android/avd/gradle-managed/*.avd/snapshots/default_boot/
+      - name: Make the restored snapshot stale (experiment)
+        run: echo "hw.ramSize = 1999" >> ~/.config/.android/avd/gradle-managed/*.avd/snapshots/default_boot/hardware.ini
 
       # The runner has /dev/kvm but only root may open it; without it the emulator falls back to
       # software emulation, too slow to boot inside the timeout.
