@@ -106,3 +106,5 @@ class MainActivity : ComponentActivity() {
         )
     }
 }
+
+val   exp_badly_formatted=1
