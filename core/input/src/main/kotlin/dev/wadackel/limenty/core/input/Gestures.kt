@@ -35,10 +35,13 @@ sealed interface GestureBehaviour {
     /** Nothing happens. The default for gestures the initial preset leaves free. */
     data object None : GestureBehaviour
 
-    /** Fires once when the gesture is recognised. */
-    data class SendKey(val key: TerminalKey, val modifiers: Modifiers = Modifiers.None) : GestureBehaviour
-
-    data class SendChord(val codePoint: Int, val modifiers: Modifiers) : GestureBehaviour
+    /**
+     * Sends its steps once when the gesture is recognised.
+     *
+     * The same steps a key bar button sends, so a gesture can send whatever a button can rather than
+     * only the keys a preset names: each missing key used to mean another entry in [Assignable].
+     */
+    data class SendKeys(val steps: List<KeyStep>) : GestureBehaviour
 
     data object ShowKeyboard : GestureBehaviour
 
@@ -62,8 +65,9 @@ sealed interface GestureBehaviour {
     val id: String
         get() = when (this) {
             is None -> "none"
-            is SendKey -> "key:${key.name}:${modifiers.bits}"
-            is SendChord -> "chord:$codePoint:${modifiers.bits}"
+            // A kind rather than an identity: the steps are stored beside it, and this is what the log
+            // records, which must not carry the text a step sends.
+            is SendKeys -> "keys"
             is ShowKeyboard -> "keyboard.show"
             is HideKeyboard -> "keyboard.hide"
             is ToggleKeyboard -> "keyboard.toggle"
@@ -72,21 +76,6 @@ sealed interface GestureBehaviour {
             is Scroll -> "scroll"
             is FontZoom -> "font.zoom"
             is SelectText -> "select"
-        }
-
-    val displayName: String
-        get() = when (this) {
-            is None -> "None"
-            is SendKey -> if (modifiers.isEmpty) key.name else "$modifiers+${key.name}"
-            is SendChord -> "$modifiers+${String(Character.toChars(codePoint))}"
-            is ShowKeyboard -> "Show keyboard"
-            is HideKeyboard -> "Hide keyboard"
-            is ToggleKeyboard -> "Toggle keyboard"
-            is Paste -> "Paste"
-            is Copy -> "Copy"
-            is Scroll -> "Scroll"
-            is FontZoom -> "Font zoom"
-            is SelectText -> "Select text"
         }
 
     companion object {
@@ -110,22 +99,46 @@ sealed interface GestureBehaviour {
                 Copy,
                 // On the alternate screen there is no local scrollback, so a swipe bound to an
                 // arrow key is the only way tmux and nvim can be scrolled by touch.
-                SendKey(TerminalKey.ArrowUp),
-                SendKey(TerminalKey.ArrowDown),
-                SendKey(TerminalKey.ArrowLeft),
-                SendKey(TerminalKey.ArrowRight),
-                SendKey(TerminalKey.Escape),
-                SendKey(TerminalKey.Tab),
-                SendKey(TerminalKey.Enter),
-                SendKey(TerminalKey.PageUp),
-                SendKey(TerminalKey.PageDown),
-                SendChord('c'.code, Modifiers.Ctrl),
-                SendChord('d'.code, Modifiers.Ctrl),
-                SendChord('l'.code, Modifiers.Ctrl),
+                key(TerminalKey.ArrowUp),
+                key(TerminalKey.ArrowDown),
+                key(TerminalKey.ArrowLeft),
+                key(TerminalKey.ArrowRight),
+                key(TerminalKey.Escape),
+                key(TerminalKey.Tab),
+                key(TerminalKey.Enter),
+                key(TerminalKey.PageUp),
+                key(TerminalKey.PageDown),
+                ctrl('c'),
+                ctrl('d'),
+                ctrl('l'),
             )
         }
 
-        fun byId(id: String): GestureBehaviour = Assignable.firstOrNull { it.id == id } ?: None
+        /**
+         * The behaviour an id names: one of the fixed behaviours, or a key stored under the
+         * single-key ids written before a gesture could send several steps.
+         *
+         * Those ids, `key:Tab:0` and `chord:99:4`, are what the owner's phone holds, and reading
+         * them as nothing would quietly unbind the gestures configured with them.
+         */
+        fun byId(id: String): GestureBehaviour = Assignable.firstOrNull { it !is SendKeys && it.id == id }
+            ?: singleKey(id)
+            ?: None
+
+        private fun key(key: TerminalKey) = SendKeys(listOf(KeyStep.Press(key = key)))
+
+        private fun ctrl(char: Char) = SendKeys(listOf(KeyStep.Press(codePoint = char.code, modifiers = Modifiers.Ctrl)))
+
+        private fun singleKey(id: String): SendKeys? {
+            val (kind, value, bits) = id.split(':').takeIf { it.size == 3 } ?: return null
+            val modifiers = Modifiers(bits.toIntOrNull() ?: return null)
+            val step = when (kind) {
+                "key" -> KeyStep.Press(key = TerminalKey.entries.firstOrNull { it.name == value } ?: return null, modifiers = modifiers)
+                "chord" -> KeyStep.Press(codePoint = value.toIntOrNull()?.takeIf { it > 0 } ?: return null, modifiers = modifiers)
+                else -> return null
+            }
+            return SendKeys(listOf(step))
+        }
     }
 }
 

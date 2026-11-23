@@ -47,6 +47,9 @@ val LimentyDialogMargin = 20.dp
  */
 val LimentyDialogMaxWidth = 560.dp
 
+/** Between the parts of a box, and between the parts of a form placed in one as a single block. */
+val LimentyDialogGap = 14.dp
+
 /**
  * Everything this app asks in a box of its own.
  *
@@ -101,7 +104,7 @@ fun LimentyDialogSurface(
             .background(LimentyColors.Surface3)
             .verticalScroll(rememberScrollState())
             .padding(LimentySpacing.FloatingPadding),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+        verticalArrangement = Arrangement.spacedBy(LimentyDialogGap),
     ) {
         Text(text = title, style = LimentyText.Heading)
         content()

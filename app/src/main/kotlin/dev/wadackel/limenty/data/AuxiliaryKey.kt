@@ -1,46 +1,11 @@
 package dev.wadackel.limenty.data
 
+import dev.wadackel.limenty.core.input.KeyStep
 import dev.wadackel.limenty.core.input.Modifiers
 import dev.wadackel.limenty.core.input.TerminalInputEvent
 import dev.wadackel.limenty.core.input.TerminalKey
 import org.json.JSONArray
 import org.json.JSONObject
-
-/**
- * One thing a button sends.
- *
- * A button sends a list of these rather than a single action, because the shortcuts worth putting
- * on a bar are often two keystrokes: a tmux prefix and the command key after it is one button's
- * worth of intent and two of typing.
- */
-sealed interface KeyStep {
-    /** A key press: a named key, or a code point, with whatever was held down. */
-    data class Press(
-        val key: TerminalKey? = null,
-        val codePoint: Int = 0,
-        val modifiers: Modifiers = Modifiers.None,
-    ) : KeyStep
-
-    /** Text, sent as typed. What saves `git status` from being eleven presses. */
-    data class Literal(val text: String) : KeyStep
-
-    /**
-     * What this step puts on the wire, or null when it is bound to nothing.
-     *
-     * A code point with a modifier is a chord and without one is text — the same distinction the
-     * encoder draws, made here so that what is stored stays the configuration rather than the
-     * conclusion drawn from it.
-     */
-    fun toEvent(): TerminalInputEvent? = when (this) {
-        is Literal -> TerminalInputEvent.Text(text).takeIf { text.isNotEmpty() }
-        is Press -> when {
-            key != null -> TerminalInputEvent.Key(key, modifiers)
-            codePoint > 0 && !modifiers.isEmpty -> TerminalInputEvent.Chord(codePoint, modifiers)
-            codePoint > 0 -> TerminalInputEvent.Text(String(Character.toChars(codePoint)))
-            else -> null
-        }
-    }
-}
 
 /**
  * A button that sends one thing, which most of them do.
@@ -250,19 +215,7 @@ data class AuxiliaryKey(
         fun encodeBar(keys: List<AuxiliaryKey>): String {
             val array = JSONArray()
             keys.forEach { entry ->
-                val steps = JSONArray()
-                entry.steps.forEach { step ->
-                    steps.put(
-                        when (step) {
-                            is KeyStep.Literal -> JSONObject().put("text", step.text)
-                            is KeyStep.Press -> JSONObject()
-                                .put("key", step.key?.name ?: JSONObject.NULL)
-                                .put("codePoint", step.codePoint)
-                                .put("modifiers", step.modifiers.bits)
-                        },
-                    )
-                }
-                array.put(JSONObject().put("label", entry.label).put("steps", steps))
+                array.put(JSONObject().put("label", entry.label).put("steps", KeyStepJson.encodeAll(entry.steps)))
             }
             return array.toString()
         }
@@ -282,22 +235,12 @@ data class AuxiliaryKey(
                 AuxiliaryKey(
                     label = item.getString("label"),
                     steps = if (stored == null) {
-                        listOf(decodeStep(item))
+                        listOf(KeyStepJson.decode(item))
                     } else {
-                        (0 until stored.length()).map { decodeStep(stored.getJSONObject(it)) }
+                        KeyStepJson.decodeAll(stored)
                     },
                 )
             }
         }.getOrNull()
-
-        private fun decodeStep(item: JSONObject): KeyStep {
-            if (item.has("text")) return KeyStep.Literal(item.getString("text"))
-            return KeyStep.Press(
-                key = item.optString("key").takeIf { it.isNotEmpty() && it != "null" }
-                    ?.let(TerminalKey::valueOf),
-                codePoint = item.optInt("codePoint"),
-                modifiers = Modifiers(item.optInt("modifiers")),
-            )
-        }
     }
 }

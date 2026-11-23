@@ -8,12 +8,19 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.wadackel.limenty.Screenshots
+import dev.wadackel.limenty.core.input.Gesture
+import dev.wadackel.limenty.core.input.GestureBehaviour
+import dev.wadackel.limenty.core.input.GestureBindings
+import dev.wadackel.limenty.core.input.KeyStep
+import dev.wadackel.limenty.core.input.Modifiers
+import dev.wadackel.limenty.core.input.TerminalKey
 import dev.wadackel.limenty.core.session.SessionId
 import dev.wadackel.limenty.core.session.TerminalSession
 import dev.wadackel.limenty.core.terminal.TerminalFont
@@ -129,6 +136,25 @@ class LongNameScreenshotsTest {
         save(show { HostList(selectedHostId = longHost.id) }, "host-detail-unfolded")
     }
 
+    @Test
+    fun `long keys bound to a gesture on the cover display`() {
+        save(show { Settings(SettingsSection.Gestures, gesturePreferences) }, "gestures-folded")
+    }
+
+    @Test
+    @Config(qualifiers = UNFOLDED)
+    fun `long keys bound to a gesture on the unfolded display`() {
+        save(show { Settings(SettingsSection.Gestures, gesturePreferences) }, "gestures-unfolded")
+    }
+
+    @Test
+    fun `long keys bound to a gesture on the picker's custom row`() {
+        show { Settings(SettingsSection.Gestures, gesturePreferences) }
+        compose.onAllNodesWithText("Swipe left")[0].performClick()
+        compose.waitForIdle()
+        save(Screenshots.capture(compose, compose.onNode(isDialog())), "gesture-picker-folded")
+    }
+
     private var content by mutableStateOf<@Composable () -> Unit>({})
     private var started = false
 
@@ -169,9 +195,9 @@ class LongNameScreenshotsTest {
     }
 
     @Composable
-    private fun Settings(section: SettingsSection) {
+    private fun Settings(section: SettingsSection, preferences: TerminalPreferences = themePreferences) {
         SettingsScreen(
-            preferences = themePreferences,
+            preferences = preferences,
             typefaces = typefaces,
             section = section,
             onSelectSection = {},
@@ -255,6 +281,22 @@ class LongNameScreenshotsTest {
 
         val longTheme = CustomTheme("custom:long", TerminalPalette.Default.copy(name = LONG_THEME_NAME))
         val themePreferences = TerminalPreferences(themeId = longTheme.id, customThemes = listOf(longTheme))
+
+        /** Keys built by hand can run to a whole command line, typed out as text. */
+        val gesturePreferences = TerminalPreferences(
+            gestures = GestureBindings.Initial
+                .with(
+                    Gesture.SwipeLeft,
+                    GestureBehaviour.SendKeys(
+                        listOf(
+                            KeyStep.Press(codePoint = 'u'.code, modifiers = Modifiers.Ctrl),
+                            KeyStep.Literal("git log --oneline --graph --decorate --all --since=two.weeks.ago"),
+                            KeyStep.Press(key = TerminalKey.Enter),
+                        ),
+                    ),
+                )
+                .with(Gesture.DoubleTap, GestureBehaviour.SendKeys(listOf(KeyStep.Press(key = TerminalKey.Tab, modifiers = Modifiers.Shift)))),
+        )
 
         val keyBarPreferences = TerminalPreferences(
             keySets = listOf(

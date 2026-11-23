@@ -19,6 +19,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
+import org.json.JSONObject
 
 /**
  * Global terminal settings: there are no per-host overrides in V1.
@@ -269,26 +271,41 @@ class TerminalSettings(context: Context, private val scope: CoroutineScope) {
     }
 
     /**
-     * Stored as gesture-to-behaviour ids. Unknown ids fall back to None rather than failing the
-     * whole read, so a binding removed in a later version cannot strand the other settings.
+     * Stored as gesture-to-behaviour ids, or as the steps themselves for a gesture that sends keys.
+     * An entry that cannot be read falls back to None rather than failing the whole read, so a
+     * binding removed in a later version cannot strand the other settings.
      */
     private fun readGestures(): GestureBindings? {
         val encoded = preferences.getString(KEY_GESTURES, null) ?: return null
         return runCatching {
             var bindings = GestureBindings(emptyMap())
-            org.json.JSONObject(encoded).let { json ->
+            JSONObject(encoded).let { json ->
                 Gesture.entries.forEach { gesture ->
-                    val id = json.optString(gesture.name, null) ?: return@forEach
-                    bindings = bindings.with(gesture, GestureBehaviour.byId(id))
+                    val stored = json.opt(gesture.name) ?: return@forEach
+                    bindings = bindings.with(gesture, decodeGesture(stored))
                 }
             }
             bindings
         }.getOrNull()
     }
 
+    private fun decodeGesture(stored: Any): GestureBehaviour = when (stored) {
+        is JSONArray -> runCatching { GestureBehaviour.SendKeys(KeyStepJson.decodeAll(stored)) }
+            .getOrNull()
+            ?.takeIf { it.steps.isNotEmpty() }
+            ?: GestureBehaviour.None
+        is String -> GestureBehaviour.byId(stored)
+        else -> GestureBehaviour.None
+    }
+
     private fun encodeGestures(bindings: GestureBindings): String {
-        val json = org.json.JSONObject()
-        bindings.entries().forEach { (gesture, behaviour) -> json.put(gesture.name, behaviour.id) }
+        val json = JSONObject()
+        bindings.entries().forEach { (gesture, behaviour) ->
+            json.put(
+                gesture.name,
+                if (behaviour is GestureBehaviour.SendKeys) KeyStepJson.encodeAll(behaviour.steps) else behaviour.id,
+            )
+        }
         return json.toString()
     }
 

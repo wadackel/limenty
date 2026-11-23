@@ -1,5 +1,6 @@
 package dev.wadackel.limenty.data
 
+import dev.wadackel.limenty.core.input.KeyStep
 import dev.wadackel.limenty.core.input.Modifiers
 import dev.wadackel.limenty.core.input.TerminalKey
 import org.junit.Assert.assertEquals

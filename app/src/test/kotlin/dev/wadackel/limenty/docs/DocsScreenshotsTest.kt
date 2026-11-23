@@ -22,6 +22,7 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.wadackel.limenty.Screenshots
+import dev.wadackel.limenty.core.input.KeyStep
 import dev.wadackel.limenty.core.input.Modifiers
 import dev.wadackel.limenty.core.session.SessionId
 import dev.wadackel.limenty.core.session.TerminalSession
@@ -34,7 +35,6 @@ import dev.wadackel.limenty.core.transport.TerminalTransport
 import dev.wadackel.limenty.data.AuxiliaryKey
 import dev.wadackel.limenty.data.HostProfile
 import dev.wadackel.limenty.data.KeySet
-import dev.wadackel.limenty.data.KeyStep
 import dev.wadackel.limenty.data.TerminalPreferences
 import dev.wadackel.limenty.terminal.TerminalTypefaces
 import dev.wadackel.limenty.terminal.TerminalView

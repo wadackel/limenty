@@ -6,6 +6,9 @@ import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
 import dev.wadackel.limenty.core.input.Gesture
 import dev.wadackel.limenty.core.input.GestureBehaviour
+import dev.wadackel.limenty.core.input.KeyStep
+import dev.wadackel.limenty.core.input.Modifiers
+import dev.wadackel.limenty.core.input.TerminalKey
 import dev.wadackel.limenty.core.terminal.TerminalPalette
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -173,6 +176,54 @@ class TerminalSettingsTest {
         writeSettings { it.copy(gestures = it.gestures.with(Gesture.DoubleTap, GestureBehaviour.Copy)) }
 
         assertThat(storedValues().gestures[Gesture.DoubleTap]).isEqualTo(GestureBehaviour.Copy)
+    }
+
+    @Test
+    fun keysBuiltForAGestureAreRememberedStepByStep() {
+        val keys = GestureBehaviour.SendKeys(
+            listOf(
+                KeyStep.Press(key = TerminalKey.Tab, modifiers = Modifiers.Shift),
+                KeyStep.Press(codePoint = 'b'.code, modifiers = Modifiers.Ctrl),
+                KeyStep.Literal("git status"),
+                KeyStep.Press(key = TerminalKey.Enter),
+            ),
+        )
+        writeSettings { it.copy(gestures = it.gestures.with(Gesture.SwipeLeft, keys)) }
+
+        val reloaded = storedValues().gestures
+        assertThat(reloaded[Gesture.SwipeLeft]).isEqualTo(keys)
+        assertThat(reloaded[Gesture.LongPress]).isEqualTo(GestureBehaviour.SelectText)
+    }
+
+    /** What an earlier version wrote for a key, and so what is on the owner's phone. */
+    @Test
+    fun aKeyStoredByAnEarlierVersionIsStillBound() {
+        context.getSharedPreferences("limenty-settings", Context.MODE_PRIVATE)
+            .edit()
+            .putString("gestures", """{"DoubleTap":"chord:99:4","SwipeLeft":"key:Tab:0","LongPress":"select"}""")
+            .commit()
+
+        val values = storedValues().gestures
+        assertThat(values[Gesture.DoubleTap])
+            .isEqualTo(GestureBehaviour.SendKeys(listOf(KeyStep.Press(codePoint = 'c'.code, modifiers = Modifiers.Ctrl))))
+        assertThat(values[Gesture.SwipeLeft]).isEqualTo(GestureBehaviour.SendKeys(listOf(KeyStep.Press(key = TerminalKey.Tab))))
+        assertThat(values[Gesture.LongPress]).isEqualTo(GestureBehaviour.SelectText)
+    }
+
+    @Test
+    fun keysThatCannotBeReadUnbindOnlyTheirOwnGesture() {
+        context.getSharedPreferences("limenty-settings", Context.MODE_PRIVATE)
+            .edit()
+            .putString(
+                "gestures",
+                """{"SwipeLeft":[{"key":"InventedLater","codePoint":0,"modifiers":0}],"SwipeRight":[],"DoubleTap":"copy"}""",
+            )
+            .commit()
+
+        val values = storedValues().gestures
+        assertThat(values[Gesture.SwipeLeft]).isEqualTo(GestureBehaviour.None)
+        assertThat(values[Gesture.SwipeRight]).isEqualTo(GestureBehaviour.None)
+        assertThat(values[Gesture.DoubleTap]).isEqualTo(GestureBehaviour.Copy)
     }
 
     /** A binding written by a later version must not strand the settings that came with it. */
