@@ -123,8 +123,10 @@ jobs:
           -Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader_indirect
           -Pandroid.testInstrumentationRunnerArguments.sshHost=10.0.2.2
 
+      # On success too: the per-test times in the results are how a slow test gets found, and a
+      # passing run is the only kind that has all of them.
       - name: Reports
-        if: failure()
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7.0.2
         with:
           name: instrumentation-reports
