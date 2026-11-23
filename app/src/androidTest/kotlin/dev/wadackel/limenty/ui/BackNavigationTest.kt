@@ -13,6 +13,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.rule.GrantPermissionRule
 import dev.wadackel.limenty.MainActivity
 import org.junit.Rule
+import android.util.Log
 import org.junit.Test
 import org.junit.rules.RuleChain
 import org.junit.runner.RunWith
@@ -72,11 +73,19 @@ class BackNavigationTest {
 
     @Test
     fun backLeavesSettingsForTheHostList() {
-        openSettings()
-
+        val t0 = System.nanoTime()
+        fun mark(what: String) = Log.i("ExpTiming", "$what ${(System.nanoTime() - t0) / 1_000_000}ms")
+        mark("start")
+        rule.waitForIdle()
+        mark("idle")
+        rule.onNodeWithText("Settings").performClick()
+        mark("clicked")
+        awaitSettingsIndex()
+        mark("index")
         Espresso.pressBack()
-
+        mark("back")
         awaitHostList()
+        mark("list")
     }
 
     @Test

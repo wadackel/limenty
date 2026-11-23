@@ -122,6 +122,17 @@ jobs:
           nix develop -c ./gradlew :app:ciDebugAndroidTest
           -Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader_indirect
           -Pandroid.testInstrumentationRunnerArguments.sshHost=10.0.2.2
+          -Pandroid.testInstrumentationRunnerArguments.class=dev.wadackel.limenty.ui.BackNavigationTest
+
+      - name: AVD layout
+        if: always()
+        run: |
+          d=~/.config/.android/avd/gradle-managed
+          ls -la $d $d/*.avd $d/*.avd/snapshots/* || true
+          du -sh $d $d/* $d/*.avd/* $d/*.avd/snapshots/* /usr/local/lib/android/sdk/system-images/android-36/aosp_atd/x86_64 /usr/local/lib/android/sdk/emulator 2>/dev/null || true
+          cat $d/*.avd/config.ini | head -80 || true
+          time (tar -C ~ -cf - .config/.android/avd/gradle-managed | zstd -T0 -3 | wc -c)
+          df -h /
 
       # On success too: the per-test times in the results are how a slow test gets found, and a
       # passing run is the only kind that has all of them.
