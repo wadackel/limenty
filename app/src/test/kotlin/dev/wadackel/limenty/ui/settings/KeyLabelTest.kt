@@ -13,11 +13,11 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.unit.dp
+import dev.wadackel.limenty.core.input.KeyStep
 import dev.wadackel.limenty.core.input.Modifiers
 import dev.wadackel.limenty.core.input.TerminalKey
 import dev.wadackel.limenty.data.AuxiliaryKey
 import dev.wadackel.limenty.data.KeySet
-import dev.wadackel.limenty.data.KeyStep
 import dev.wadackel.limenty.data.TerminalPreferences
 import dev.wadackel.limenty.ui.theme.LimentyTheme
 import org.junit.Assert.assertEquals

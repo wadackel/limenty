@@ -33,13 +33,14 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.wadackel.limenty.core.input.KeyStep
 import dev.wadackel.limenty.core.input.Modifiers
 import dev.wadackel.limenty.core.input.TerminalKey
 import dev.wadackel.limenty.data.AuxiliaryKey
-import dev.wadackel.limenty.data.KeyStep
 import dev.wadackel.limenty.ui.components.LimentyChevron
 import dev.wadackel.limenty.ui.components.LimentyDialog
 import dev.wadackel.limenty.ui.components.LimentyDialogActions
+import dev.wadackel.limenty.ui.components.LimentyDialogGap
 import dev.wadackel.limenty.ui.components.LimentyField
 import dev.wadackel.limenty.ui.components.LimentyTextButton
 import dev.wadackel.limenty.ui.components.SectionHeading
@@ -75,7 +76,6 @@ import dev.wadackel.limenty.ui.theme.LimentyText
  * button inset by a third amount — and drew a field whose border was too dark to make out against
  * the surface behind it, so the form read as a column of loose words rather than as a form.
  */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun AuxiliaryKeyDialog(
     initial: AuxiliaryKey,
@@ -87,19 +87,12 @@ fun AuxiliaryKeyDialog(
     // Never empty: an editor with nothing to edit has no fields to show, and a key stored with no
     // steps is a key that does nothing, which is the state a fresh empty step already represents.
     var steps by remember { mutableStateOf(initial.steps.ifEmpty { listOf(KeyStep.Press()) }) }
-    var selected by remember { mutableIntStateOf(0) }
-    var keyMenuOpen by remember { mutableStateOf(false) }
-    val order = rememberReorderState<KeyStep>()
 
     // Null while the label is the steps' to give.
     var ownLabel by remember {
         mutableStateOf(if (initial.hasOwnName()) initial.label else null)
     }
     val label = ownLabel ?: AuxiliaryKey.labelFor(steps)
-
-    val at = selected.coerceIn(0, steps.lastIndex)
-    val step = steps[at]
-    val replace: (KeyStep) -> Unit = { edited -> steps = steps.toMutableList().also { it[at] = edited } }
 
     LimentyDialog(title = "Auxiliary key", onDismissRequest = onDismiss) {
         LimentyField(
@@ -123,6 +116,61 @@ fun AuxiliaryKeyDialog(
             },
         )
 
+        KeyStepsEditor(steps = steps, onStepsChange = { steps = it })
+
+        // Where the key lives and whether it lives at all, next to what it does. These used to
+        // be buttons crowded into the key's own face on the list behind this dialog, which left
+        // that face too small to read and nothing but a face to drag.
+        placement?.let { where ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                LimentyTextButton(
+                    label = if (where.pinned) "Unpin" else "Pin right",
+                    onClick = where.onTogglePin,
+                )
+                LimentyTextButton(
+                    label = "Remove",
+                    onClick = where.onRemove,
+                    color = LimentyColors.Danger,
+                )
+            }
+        }
+
+        LimentyDialogActions {
+            LimentyTextButton("Cancel", onDismiss, color = LimentyColors.Text2)
+            LimentyTextButton(
+                label = "Save",
+                onClick = { onSave(AuxiliaryKey(label = label, steps = steps)) },
+                enabled = label.isNotBlank() && sendsEveryStep(steps),
+            )
+        }
+    }
+}
+
+/**
+ * Edits what a key bar button or a gesture sends: a row of steps, and the fields of the selected one.
+ *
+ * Both editors use this one so a sequence is built the same way wherever it is sent from. What
+ * each step can be — a named key, a character, text, with Ctrl, Alt or Shift — is the encoder's
+ * vocabulary, offered as a picker rather than typed so nothing here can name what it cannot send.
+ *
+ * [steps] is never empty; the caller starts from one empty step, which is what nothing chosen yet
+ * looks like.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+internal fun KeyStepsEditor(steps: List<KeyStep>, onStepsChange: (List<KeyStep>) -> Unit) {
+    var selected by remember { mutableIntStateOf(0) }
+    var keyMenuOpen by remember { mutableStateOf(false) }
+    val order = rememberReorderState<KeyStep>()
+
+    val at = selected.coerceIn(0, steps.lastIndex)
+    val step = steps[at]
+    val replace: (KeyStep) -> Unit = { edited -> onStepsChange(steps.toMutableList().also { it[at] = edited }) }
+
+    Column(verticalArrangement = Arrangement.spacedBy(LimentyDialogGap)) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -136,8 +184,8 @@ fun AuxiliaryKeyDialog(
                 LimentyTextButton(
                     label = "Remove step",
                     onClick = {
-                        steps = steps.toMutableList().also { it.removeAt(at) }
-                        selected = at.coerceAtMost(steps.lastIndex)
+                        onStepsChange(steps.toMutableList().also { it.removeAt(at) })
+                        selected = at.coerceAtMost(steps.lastIndex - 1)
                     },
                     // Not Danger: the step only leaves a draft the dialog's Cancel still throws away.
                     color = LimentyColors.Text2,
@@ -151,7 +199,7 @@ fun AuxiliaryKeyDialog(
                         // The selection follows the step it was on rather than the position it
                         // occupied, or dragging one step would silently start editing another.
                         selected = moved.indexOfFirst { it === steps[at] }.coerceAtLeast(0)
-                        steps = moved
+                        onStepsChange(moved)
                     },
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -168,8 +216,8 @@ fun AuxiliaryKeyDialog(
                 }
                 AddStepChip(
                     onClick = {
-                        steps = steps + KeyStep.Press()
-                        selected = steps.lastIndex
+                        onStepsChange(steps + KeyStep.Press())
+                        selected = steps.size
                     },
                 )
             }
@@ -238,39 +286,14 @@ fun AuxiliaryKeyDialog(
                 }
             }
         }
-
-        // Where the key lives and whether it lives at all, next to what it does. These used to
-        // be buttons crowded into the key's own face on the list behind this dialog, which left
-        // that face too small to read and nothing but a face to drag.
-        placement?.let { where ->
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                LimentyTextButton(
-                    label = if (where.pinned) "Unpin" else "Pin right",
-                    onClick = where.onTogglePin,
-                )
-                LimentyTextButton(
-                    label = "Remove",
-                    onClick = where.onRemove,
-                    color = LimentyColors.Danger,
-                )
-            }
-        }
-
-        LimentyDialogActions {
-            LimentyTextButton("Cancel", onDismiss, color = LimentyColors.Text2)
-            LimentyTextButton(
-                label = "Save",
-                onClick = { onSave(AuxiliaryKey(label = label, steps = steps)) },
-                // Every step, not just the selected one: a step left unconfigured sends nothing,
-                // and a key with a gap in the middle of its sequence is not what anyone meant.
-                enabled = label.isNotBlank() && steps.all { it.toEvent() != null },
-            )
-        }
     }
 }
+
+/**
+ * Every step, not just the selected one: a step left unconfigured sends nothing, and a sequence
+ * with a gap in the middle is not what anyone meant.
+ */
+internal fun sendsEveryStep(steps: List<KeyStep>): Boolean = steps.isNotEmpty() && steps.all { it.toEvent() != null }
 
 /** What the picker calls the step it is editing. */
 private fun actionName(step: KeyStep): String = when (step) {

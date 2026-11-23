@@ -6,6 +6,7 @@ import dev.wadackel.limenty.core.common.log.TermLog
 import dev.wadackel.limenty.core.input.Gesture
 import dev.wadackel.limenty.core.input.GestureBehaviour
 import dev.wadackel.limenty.core.input.GestureBindings
+import dev.wadackel.limenty.core.input.KeyStep
 import dev.wadackel.limenty.core.terminal.TerminalPalette
 import dev.wadackel.limenty.core.terminal.TerminalTypography
 import kotlinx.coroutines.CoroutineScope
@@ -19,6 +20,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
+import org.json.JSONObject
 
 /**
  * Global terminal settings: there are no per-host overrides in V1.
@@ -269,27 +272,60 @@ class TerminalSettings(context: Context, private val scope: CoroutineScope) {
     }
 
     /**
-     * Stored as gesture-to-behaviour ids. Unknown ids fall back to None rather than failing the
+     * Stored as gesture-to-behaviour ids, or as the steps themselves for keys longer than one (see
+     * [encodeGesture]). An entry that cannot be read falls back to None rather than failing the
      * whole read, so a binding removed in a later version cannot strand the other settings.
      */
     private fun readGestures(): GestureBindings? {
         val encoded = preferences.getString(KEY_GESTURES, null) ?: return null
         return runCatching {
             var bindings = GestureBindings(emptyMap())
-            org.json.JSONObject(encoded).let { json ->
+            JSONObject(encoded).let { json ->
                 Gesture.entries.forEach { gesture ->
-                    val id = json.optString(gesture.name, null) ?: return@forEach
-                    bindings = bindings.with(gesture, GestureBehaviour.byId(id))
+                    val stored = json.opt(gesture.name) ?: return@forEach
+                    bindings = bindings.with(gesture, decodeGesture(stored))
                 }
             }
             bindings
         }.getOrNull()
     }
 
+    private fun decodeGesture(stored: Any): GestureBehaviour = when (stored) {
+        // The code point is checked here rather than in KeyStepJson, which the key bar shares: the
+        // bar discards every set for one unreadable step, a far larger loss than the one key.
+        is JSONArray -> runCatching { KeyStepJson.decodeAll(stored) }
+            .getOrNull()
+            ?.takeIf { steps -> steps.isNotEmpty() && steps.all(::isCharacterOrKey) }
+            ?.let(GestureBehaviour::SendKeys)
+            ?: GestureBehaviour.None
+        is String -> GestureBehaviour.byId(stored)
+        else -> GestureBehaviour.None
+    }
+
+    /** Read as it stands, a code point no character has would fail each time the step is drawn or sent. */
+    private fun isCharacterOrKey(step: KeyStep): Boolean = step !is KeyStep.Press || step.codePoint == 0 || Character.isValidCodePoint(step.codePoint)
+
     private fun encodeGestures(bindings: GestureBindings): String {
-        val json = org.json.JSONObject()
-        bindings.entries().forEach { (gesture, behaviour) -> json.put(gesture.name, behaviour.id) }
+        val json = JSONObject()
+        bindings.entries().forEach { (gesture, behaviour) -> json.put(gesture.name, encodeGesture(behaviour)) }
         return json.toString()
+    }
+
+    /**
+     * One key is written as the id an earlier version wrote for it, and only longer keys as steps:
+     * a build from before steps, installed over this one, then still finds the presets it offered
+     * rather than reading every key binding as nothing.
+     */
+    private fun encodeGesture(behaviour: GestureBehaviour): Any {
+        if (behaviour !is GestureBehaviour.SendKeys) return behaviour.id
+        val press = behaviour.steps.singleOrNull() as? KeyStep.Press
+        val key = press?.key
+        return when {
+            press == null -> KeyStepJson.encodeAll(behaviour.steps)
+            key != null -> "key:${key.name}:${press.modifiers.bits}"
+            press.codePoint > 0 && !press.modifiers.isEmpty -> "chord:${press.codePoint}:${press.modifiers.bits}"
+            else -> KeyStepJson.encodeAll(behaviour.steps)
+        }
     }
 
     private companion object {

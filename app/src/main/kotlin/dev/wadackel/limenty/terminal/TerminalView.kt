@@ -562,7 +562,13 @@ class TerminalView(context: Context) : TerminalInputView(context) {
 
     private fun perform(gesture: Gesture, event: MotionEvent): Boolean {
         val behaviour = gestures[gesture]
-        gestureLog.d("gesture", "gesture" to gesture.name, "behaviour" to behaviour.id)
+        // The id and a count, never the steps: a step can be text typed at a password prompt.
+        val fields = listOfNotNull(
+            "gesture" to gesture.name,
+            "behaviour" to behaviour.id,
+            (behaviour as? GestureBehaviour.SendKeys)?.let { "steps" to it.steps.size },
+        )
+        gestureLog.d("gesture", *fields.toTypedArray())
         return apply(behaviour, event)
     }
 
@@ -580,13 +586,10 @@ class TerminalView(context: Context) : TerminalInputView(context) {
             toggleSoftKeyboard()
             true
         }
-        is GestureBehaviour.SendKey -> {
-            onInputEvents(listOf(TerminalInputEvent.Key(behaviour.key, behaviour.modifiers)))
-            true
-        }
-        is GestureBehaviour.SendChord -> {
-            onInputEvents(listOf(TerminalInputEvent.Chord(behaviour.codePoint, behaviour.modifiers)))
-            true
+        is GestureBehaviour.SendKeys -> {
+            val events = behaviour.steps.mapNotNull { it.toEvent() }
+            if (events.isNotEmpty()) onInputEvents(events)
+            events.isNotEmpty()
         }
         is GestureBehaviour.SelectText -> {
             beginSelectionAt(event.x, event.y)

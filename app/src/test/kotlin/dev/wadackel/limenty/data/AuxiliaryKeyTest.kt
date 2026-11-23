@@ -2,6 +2,7 @@ package dev.wadackel.limenty.data
 
 import android.app.Application
 import com.google.common.truth.Truth.assertThat
+import dev.wadackel.limenty.core.input.KeyStep
 import dev.wadackel.limenty.core.input.Modifiers
 import dev.wadackel.limenty.core.input.TerminalInputEvent
 import dev.wadackel.limenty.core.input.TerminalKey
