@@ -137,6 +137,22 @@ until the images are recorded again; the expected and actual pictures are left i
 `app/build/outputs/roborazzi/`. The terminal content is written by `DocsScenes` for whatever
 grid the screen lays out, so a font or layout change re-records cleanly instead of wrapping.
 
+### Long names
+
+`LongNameScreenshotsTest` draws the screens that show a name someone typed or a remote sent (a
+theme, a key set, a host, a session's title) with names far longer than the room they get, on the
+cover and the unfolded display. It is compared the same way, against
+`app/src/test/screenshots/long-names/`. These images are a regression check, not pictures for the
+README.
+
+```sh
+./gw :app:recordRoborazziDebug --tests 'dev.wadackel.limenty.ui.LongNameScreenshotsTest'
+```
+
+Before committing re-recorded images, open each one and look for text that is cut without an
+ellipsis, runs under another element, or wraps beside a neighbour. Recording a broken layout makes
+it the expected one.
+
 ## Diagnosing a failure on a real device
 
 Subsystems log through `TermLog.logger(LogTags.X)` and emit `event key=value` lines rather than
