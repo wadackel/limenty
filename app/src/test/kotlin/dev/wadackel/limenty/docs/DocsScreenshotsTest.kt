@@ -1,7 +1,6 @@
 package dev.wadackel.limenty.docs
 
 import android.graphics.Bitmap
-import android.graphics.Canvas
 import android.graphics.Rect
 import android.view.View
 import android.view.ViewGroup
@@ -15,16 +14,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.ViewRootForTest
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
-import com.dropbox.differ.SimpleImageComparator
-import com.github.takahirom.roborazzi.RoborazziOptions
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.wadackel.limenty.Screenshots
 import dev.wadackel.limenty.core.input.Modifiers
 import dev.wadackel.limenty.core.session.SessionId
 import dev.wadackel.limenty.core.session.TerminalSession
@@ -87,20 +84,7 @@ class DocsScreenshotsTest {
         }
         scene = content
         compose.waitForIdle()
-        return capture(compose.onRoot())
-    }
-
-    /**
-     * Draws the window holding [node] into a bitmap.
-     *
-     * Compose's own captureToImage waits for the next frame, which never comes on Robolectric's
-     * paused looper; drawing the view directly is what the frame would have done anyway.
-     */
-    private fun capture(node: SemanticsNodeInteraction): Bitmap {
-        val root = (node.fetchSemanticsNode().root as ViewRootForTest).view.rootView
-        val bitmap = Bitmap.createBitmap(root.width, root.height, Bitmap.Config.ARGB_8888)
-        compose.runOnUiThread { root.draw(Canvas(bitmap)) }
-        return bitmap
+        return Screenshots.capture(compose, compose.onRoot())
     }
 
     private var started = false
@@ -108,7 +92,7 @@ class DocsScreenshotsTest {
     private fun SemanticsNodeInteraction.top(): Float = fetchSemanticsNode().boundsInRoot.top
 
     private fun save(image: Bitmap, name: String) {
-        image.captureRoboImage("$IMAGES/$name.png", roborazziOptions = options)
+        image.captureRoboImage("$IMAGES/$name.png", roborazziOptions = Screenshots.options)
     }
 
     @Test
@@ -140,7 +124,7 @@ class DocsScreenshotsTest {
         show { KeyBarSettingsScreen(preferences = docsPreferences, onChange = {}, onBack = {}) }
         compose.onAllNodesWithText("new win").let { it[it.fetchSemanticsNodes().lastIndex] }.performClick()
         compose.waitForIdle()
-        val dialog = capture(compose.onNode(isDialog()))
+        val dialog = Screenshots.capture(compose, compose.onNode(isDialog()))
         save(DocsImages.frame(DocsImages.scaleToWidth(trim(dialog), 640), radius = 40f), "key-editor")
     }
 
@@ -177,7 +161,7 @@ class DocsScreenshotsTest {
             terminalView().onCreateInputConnection(EditorInfo()).setComposingText("終了時にキューを空にする", 1)
         }
         compose.waitForIdle()
-        val screen = capture(compose.onRoot())
+        val screen = Screenshots.capture(compose, compose.onRoot())
         val cell = terminalView().metrics.cellHeight
         val strip = DocsImages.crop(screen, Rect(0, 0, screen.width, (cell * 7).toInt()))
         save(DocsImages.frame(DocsImages.scaleToWidth(DocsImages.pad(strip, 24), 960), radius = 28f), "ime")
@@ -312,19 +296,6 @@ class DocsScreenshotsTest {
     private companion object {
         /** Relative to the module, which is where Gradle runs unit tests from. */
         const val IMAGES = "../docs/images"
-
-        /**
-         * Each pixel may drift by a shade or sit one pixel over, which is how text rasterised on
-         * macOS and on the Linux CI runner differs; any pixel beyond that fails. A share of
-         * differing pixels was the obvious tolerance and was rejected: at 1% a recoloured button
-         * passed on every screen where it was small.
-         */
-        val options = RoborazziOptions(
-            compareOptions = RoborazziOptions.CompareOptions(
-                imageComparator = SimpleImageComparator(maxDistance = 0.007f, vShift = 1, hShift = 1),
-                changeThreshold = 0f,
-            ),
-        )
 
         private fun ctrl(char: Char) = KeyStep.Press(codePoint = char.code, modifiers = Modifiers.Ctrl)
         private fun press(char: Char) = KeyStep.Press(codePoint = char.code)

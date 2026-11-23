@@ -173,6 +173,11 @@ and commit them with the change. Do not loosen the comparison or skip the test t
 the tolerance is already set to what macOS and Linux disagree on and no more. See
 [`docs/development.md`](docs/development.md#documentation-screenshots).
 
+The same holds for `app/src/test/screenshots/long-names/`, the screens drawn with names longer
+than they have room for: re-record with `--tests
+'dev.wadackel.limenty.ui.LongNameScreenshotsTest'`, and before committing, look in each image for
+text cut without an ellipsis or pushed under its neighbour.
+
 ## Know what you cannot settle
 
 Some questions are not resolvable by reading code or running it, and guessing at them wastes the

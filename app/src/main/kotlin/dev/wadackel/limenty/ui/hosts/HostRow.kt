@@ -217,7 +217,7 @@ fun HostRow(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(preview.meta, style = LimentyText.MonoMeta, fontFamily = mono)
+                PreviewMeta(preview.meta, mono, modifier = Modifier.weight(1f, fill = false))
                 OpenHint("Resume")
             }
         }
@@ -352,7 +352,7 @@ internal fun HostDetail(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(preview.meta, style = LimentyText.MonoMeta, fontFamily = mono)
+                PreviewMeta(preview.meta, mono, modifier = Modifier.weight(1f, fill = false))
                 // Pressable on its own: outside the preview, nothing around it opens the session,
                 // unlike the cover display's card, which is pressed as a whole.
                 OpenHint(
@@ -393,6 +393,25 @@ internal fun HostDetail(
             }
         }
     }
+}
+
+/**
+ * The session's title and uptime beside the word that opens it.
+ *
+ * Cut to one line: the title is whatever the remote shell or tmux last set, often a long working
+ * directory. Wrapped, it took the row's width from `Resume`, which was left one letter a line on
+ * the card and not drawn at all in the detail pane.
+ */
+@Composable
+private fun PreviewMeta(meta: String, mono: FontFamily, modifier: Modifier = Modifier) {
+    Text(
+        text = meta,
+        style = LimentyText.MonoMeta,
+        fontFamily = mono,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        modifier = modifier.padding(end = LimentySpacing.SmallPadding),
+    )
 }
 
 /** The accent word that says what pressing the surface around it does. */
