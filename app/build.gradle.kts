@@ -79,7 +79,7 @@ android {
         managedDevices {
             localDevices {
                 create("ci") {
-                    device = "7.6in Foldable"
+                    device = "7.6\" Fold-in with outer display"
                     apiLevel = 36
                     systemImageSource = "aosp-atd"
                 }
