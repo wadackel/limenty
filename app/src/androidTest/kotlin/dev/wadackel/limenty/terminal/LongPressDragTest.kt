@@ -9,9 +9,13 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.google.common.truth.Truth.assertThat
+import dev.wadackel.limenty.core.common.log.LogRecord
+import dev.wadackel.limenty.core.common.log.LogSink
+import dev.wadackel.limenty.core.common.log.TermLog
 import dev.wadackel.limenty.core.input.Gesture
 import dev.wadackel.limenty.core.input.GestureBehaviour
 import dev.wadackel.limenty.core.input.GestureBindings
+import dev.wadackel.limenty.core.input.KeyStep
 import dev.wadackel.limenty.core.input.TerminalInputEvent
 import dev.wadackel.limenty.core.input.TerminalKey
 import dev.wadackel.limenty.core.session.SessionId
@@ -27,6 +31,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emptyFlow
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.util.concurrent.CopyOnWriteArrayList
 
 /**
  * A long press held still selects the word under it; a long press that moves sends arrow keys.
@@ -324,6 +329,27 @@ class LongPressDragTest {
         Touch(target, x, y).press().moveBy(drag(target)).lift()
 
         assertThat(sent).isEmpty()
+    }
+
+    /** The steps reach the remote in order; the log, which outlives the moment, holds none of them. */
+    @Test
+    fun aLongPressBoundToKeysSendsEachStepInOrderAndLogsNoneOfThem() {
+        val records = CopyOnWriteArrayList<LogRecord>()
+        val sink = LogSink { records += it }
+        TermLog.addSink(sink)
+        try {
+            val keys = GestureBehaviour.SendKeys(listOf(KeyStep.Literal("hunter2"), KeyStep.Press(key = TerminalKey.Enter)))
+            val target = view(bindings = GestureBindings.Initial.with(Gesture.LongPress, keys))
+            val (x, y) = cellCentre(target, 0, 8)
+
+            Touch(target, x, y).press().lift()
+
+            assertThat(sent).containsExactly(TerminalInputEvent.Text("hunter2"), TerminalInputEvent.Key(TerminalKey.Enter)).inOrder()
+            assertThat(records.map { it.fields }).contains(listOf("gesture" to "LongPress", "behaviour" to "keys", "steps" to "2"))
+            assertThat(records.filter { record -> record.fields.any { "hunter2" in it.second } }).isEmpty()
+        } finally {
+            TermLog.removeSink(sink)
+        }
     }
 
     private fun offlineSession(): TerminalSession = TerminalSession(

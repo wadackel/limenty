@@ -16,6 +16,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.job
 import kotlinx.coroutines.runBlocking
+import org.json.JSONObject
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
@@ -195,6 +196,19 @@ class TerminalSettingsTest {
         assertThat(reloaded[Gesture.LongPress]).isEqualTo(GestureBehaviour.SelectText)
     }
 
+    /** So a build from before steps, installed over this one, still finds the presets it offered. */
+    @Test
+    fun aSingleKeyIsStoredTheWayAnEarlierVersionWroteIt() {
+        val shiftTab = GestureBehaviour.SendKeys(listOf(KeyStep.Press(key = TerminalKey.Tab, modifiers = Modifiers.Shift)))
+        val ctrlC = GestureBehaviour.SendKeys(listOf(KeyStep.Press(codePoint = 'c'.code, modifiers = Modifiers.Ctrl)))
+        writeSettings { it.copy(gestures = it.gestures.with(Gesture.SwipeLeft, shiftTab).with(Gesture.DoubleTap, ctrlC)) }
+
+        val stored = JSONObject(context.getSharedPreferences("limenty-settings", Context.MODE_PRIVATE).getString("gestures", null)!!)
+        assertThat(stored.getString("SwipeLeft")).isEqualTo("key:Tab:${Modifiers.SHIFT}")
+        assertThat(stored.getString("DoubleTap")).isEqualTo("chord:99:${Modifiers.CTRL}")
+        assertThat(storedValues().gestures[Gesture.SwipeLeft]).isEqualTo(shiftTab)
+    }
+
     /** What an earlier version wrote for a key, and so what is on the owner's phone. */
     @Test
     fun aKeyStoredByAnEarlierVersionIsStillBound() {
@@ -216,13 +230,15 @@ class TerminalSettingsTest {
             .edit()
             .putString(
                 "gestures",
-                """{"SwipeLeft":[{"key":"InventedLater","codePoint":0,"modifiers":0}],"SwipeRight":[],"DoubleTap":"copy"}""",
+                """{"SwipeLeft":[{"key":"InventedLater","codePoint":0,"modifiers":0}],"SwipeRight":[],""" +
+                    """"SwipeUp":[{"key":null,"codePoint":1114112,"modifiers":0}],"DoubleTap":"copy"}""",
             )
             .commit()
 
         val values = storedValues().gestures
         assertThat(values[Gesture.SwipeLeft]).isEqualTo(GestureBehaviour.None)
         assertThat(values[Gesture.SwipeRight]).isEqualTo(GestureBehaviour.None)
+        assertThat(values[Gesture.SwipeUp]).isEqualTo(GestureBehaviour.None)
         assertThat(values[Gesture.DoubleTap]).isEqualTo(GestureBehaviour.Copy)
     }
 

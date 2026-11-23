@@ -50,6 +50,7 @@ class GesturesTest {
     fun `a malformed single-key id falls back to doing nothing`() {
         assertThat(GestureBehaviour.byId("key:NoSuchKey:0")).isEqualTo(GestureBehaviour.None)
         assertThat(GestureBehaviour.byId("chord:0:4")).isEqualTo(GestureBehaviour.None)
+        assertThat(GestureBehaviour.byId("chord:1114112:4")).isEqualTo(GestureBehaviour.None)
         assertThat(GestureBehaviour.byId("key:Tab")).isEqualTo(GestureBehaviour.None)
         assertThat(GestureBehaviour.byId("keys")).isEqualTo(GestureBehaviour.None)
     }

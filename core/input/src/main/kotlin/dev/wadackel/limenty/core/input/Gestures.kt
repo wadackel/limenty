@@ -134,7 +134,7 @@ sealed interface GestureBehaviour {
             val modifiers = Modifiers(bits.toIntOrNull() ?: return null)
             val step = when (kind) {
                 "key" -> KeyStep.Press(key = TerminalKey.entries.firstOrNull { it.name == value } ?: return null, modifiers = modifiers)
-                "chord" -> KeyStep.Press(codePoint = value.toIntOrNull()?.takeIf { it > 0 } ?: return null, modifiers = modifiers)
+                "chord" -> KeyStep.Press(codePoint = value.toIntOrNull()?.takeIf { it > 0 && Character.isValidCodePoint(it) } ?: return null, modifiers = modifiers)
                 else -> return null
             }
             return SendKeys(listOf(step))

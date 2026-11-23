@@ -98,8 +98,6 @@ fun GestureSettings(
     sideBySide: Boolean = false,
 ) {
     var editing by remember { mutableStateOf<Gesture?>(null) }
-
-    // The gesture whose keys are being built, over the picker it was opened from.
     var composing by remember { mutableStateOf<Gesture?>(null) }
     val (first, rest) = GestureGroups.first() to GestureGroups.drop(1)
 
@@ -127,7 +125,8 @@ fun GestureSettings(
         GestureKeysDialog(
             gesture = gesture,
             initial = (bindings[gesture] as? GestureBehaviour.SendKeys)?.steps.orEmpty(),
-            // Back to the picker it came from, where the gesture's binding is still the old one.
+            // Back to the picker rather than out of both, so a mistaken tap on Custom keys… costs
+            // one step back instead of the whole way in again.
             onDismiss = { composing = null },
             onSave = { steps ->
                 onChange(bindings.with(gesture, GestureBehaviour.SendKeys(steps)))

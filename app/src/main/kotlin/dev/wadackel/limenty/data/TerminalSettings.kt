@@ -6,6 +6,7 @@ import dev.wadackel.limenty.core.common.log.TermLog
 import dev.wadackel.limenty.core.input.Gesture
 import dev.wadackel.limenty.core.input.GestureBehaviour
 import dev.wadackel.limenty.core.input.GestureBindings
+import dev.wadackel.limenty.core.input.KeyStep
 import dev.wadackel.limenty.core.terminal.TerminalPalette
 import dev.wadackel.limenty.core.terminal.TerminalTypography
 import kotlinx.coroutines.CoroutineScope
@@ -300,13 +301,25 @@ class TerminalSettings(context: Context, private val scope: CoroutineScope) {
 
     private fun encodeGestures(bindings: GestureBindings): String {
         val json = JSONObject()
-        bindings.entries().forEach { (gesture, behaviour) ->
-            json.put(
-                gesture.name,
-                if (behaviour is GestureBehaviour.SendKeys) KeyStepJson.encodeAll(behaviour.steps) else behaviour.id,
-            )
-        }
+        bindings.entries().forEach { (gesture, behaviour) -> json.put(gesture.name, encodeGesture(behaviour)) }
         return json.toString()
+    }
+
+    /**
+     * One key is written as the id an earlier version wrote for it, and only longer keys as steps:
+     * a build from before steps, installed over this one, then still finds the presets it offered
+     * rather than reading every key binding as nothing.
+     */
+    private fun encodeGesture(behaviour: GestureBehaviour): Any {
+        if (behaviour !is GestureBehaviour.SendKeys) return behaviour.id
+        val press = behaviour.steps.singleOrNull() as? KeyStep.Press
+        val key = press?.key
+        return when {
+            press == null -> KeyStepJson.encodeAll(behaviour.steps)
+            key != null -> "key:${key.name}:${press.modifiers.bits}"
+            press.codePoint > 0 && !press.modifiers.isEmpty -> "chord:${press.codePoint}:${press.modifiers.bits}"
+            else -> KeyStepJson.encodeAll(behaviour.steps)
+        }
     }
 
     private companion object {
