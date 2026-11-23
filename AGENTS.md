@@ -210,9 +210,10 @@ owner's time twice — once on the wrong answer and once undoing it.
 ## Ship a finished change as a pull request
 
 A finished change goes on its own branch from `main`, into a pull request, and is watched until
-CI passes: read `gh pr checks <number>` after the last push, not a local test run. CI has two
-checks, `check` and `instrumentation`, and the second runs the whole `androidTest` suite on an
-emulator of its own, so a local `tools/app itest` is for iterating, not the last word. Merging is left
+CI passes: read `gh pr checks <number>` after the last push, not a local test run. CI reports
+`check`, which passes when both the unit tests and the static checks (ktlint, Android Lint,
+assemble) did, and `instrumentation`, which runs the whole `androidTest` suite on an emulator of
+its own, so a local `tools/app itest` is for iterating, not the last word. Merging is left
 to the owner, except in an unattended run, where the work is finished merge included (see "Check on
 the phone when the owner can lend it" above).
 
