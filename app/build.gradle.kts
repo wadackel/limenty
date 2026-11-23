@@ -69,6 +69,7 @@ android {
     }
 
     testOptions {
+        animationsDisabled = true
         unitTests {
             isIncludeAndroidResources = true
             isReturnDefaultValues = true
