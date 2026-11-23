@@ -37,7 +37,8 @@ literally cannot see `android.view.KeyEvent`, which is why key mapping lives in 
 ```sh
 ./gw test                     # JVM unit tests
 tools/emu create              # create the foldable AVD (idempotent)
-tools/emu start               # boot it
+tools/emu start               # boot it (LIMENTY_AVD picks another AVD; limenty_fold by default)
+tools/emu serial              # the serial of that AVD's emulator, looked up by name
 tools/emu fold | unfold       # drive the hinge sensor
 tools/emu rotate 0|1|2|3      # force a display rotation (rotate-auto restores)
 tools/emu shot out.png        # screenshot
@@ -53,9 +54,11 @@ tools/dev info | shot | fold  # drive the physical device
 
 Several devices are usually attached at once — an emulator, the phone over the cable, the phone
 over the network — so `tools/app` names one rather than letting adb pick, and says so when the
-choice is not obvious. `ANDROID_SERIAL` settles it; `tools/dev` always means the phone. Before
-picking, they wait for adb's device list to settle (up to `LIMENTY_ADB_WAIT` seconds, 30 by
-default), since a freshly restarted adb server lists devices over its first second.
+choice is not obvious. `ANDROID_SERIAL` settles it, and `LIMENTY_AVD=<avd>` settles it by the
+emulator's AVD name, which stays the same when serials change with start order; `tools/dev`
+always means the phone. Before picking, they wait for adb's device list to settle (up to
+`LIMENTY_ADB_WAIT` seconds, 30 by default), since a freshly restarted adb server lists devices
+over its first second.
 
 The AVD is a `7.6in Foldable` profile with a hinge sensor and `hw.keyboard=yes`, so fold,
 rotation and physical-key paths can be exercised without the real device. `tools/emu create`

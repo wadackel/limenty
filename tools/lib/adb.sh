@@ -28,6 +28,19 @@ adb_settle() {
   echo "$list" | awk '$2 == "offline" || $2 == "connecting" || $2 == "authorizing" { print "  " $0 }' >&2
 }
 
+# The serial of the emulator running AVD $1. Serials follow start order and other emulators are
+# often attached too (another AVD, another project), so a serial remembered from an earlier run
+# can name a different machine. The console answers the name even while the emulator is offline.
+avd_serial() {
+  local serial
+  for serial in $("$ADB" devices | awk '$1 ~ /^emulator-/ {print $1}'); do
+    if [ "$("$ADB" -s "$serial" emu avd name 2>/dev/null | head -1 | tr -d '\r')" = "$1" ]; then
+      echo "$serial"; return 0
+    fi
+  done
+  return 1
+}
+
 adb_list() {
   local list
   list=$("$ADB" devices 2>/dev/null | awk 'NR > 1 && NF') || true

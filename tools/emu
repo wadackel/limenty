@@ -19,15 +19,10 @@ is_running() { pgrep -f -- "$AVD_PATTERN" >/dev/null 2>&1; }
 
 # The phone is usually attached too, and bare adb refuses outright when more than one device is.
 # Matched by AVD name rather than taking the first emulator, which may be another AVD: `stop`
-# would then kill that one. The console answers the name even while the emulator is offline.
+# would then kill that one.
 emu_serial() {
   case "${ANDROID_SERIAL:-}" in emulator-*) echo "$ANDROID_SERIAL"; return ;; esac
-  local serial
-  for serial in $("$ADB" devices | awk '$1 ~ /^emulator-/ {print $1}'); do
-    if [ "$("$ADB" -s "$serial" emu avd name 2>/dev/null | head -1 | tr -d '\r')" = "$AVD" ]; then
-      echo "$serial"; return
-    fi
-  done
+  avd_serial "$AVD" || true
 }
 adb_() {
   local serial
@@ -101,10 +96,12 @@ case "${1:-}" in
     adb_ shell settings put system accelerometer_rotation 1
     echo "auto-rotation restored"
     ;;
+  # By name alone, ignoring ANDROID_SERIAL: this is the lookup that sets it.
+  serial) avd_serial "$AVD" || { echo "tools/emu: $AVD is not running (tools/emu start)" >&2; exit 1; } ;;
   size)  adb_ shell wm size; adb_ shell wm density ;;
   shot)  out="${2:-$LOG_DIR/shot.png}"; adb_ exec-out screencap -p > "$out"; echo "$out" ;;
   *)
-    echo "usage: tools/emu {create|start|stop|wait|fold|unfold|rotate [0-3]|rotate-auto|size|shot [path]}" >&2
+    echo "usage: tools/emu {create|start|stop|wait|serial|fold|unfold|rotate [0-3]|rotate-auto|size|shot [path]}" >&2
     exit 2
     ;;
 esac
