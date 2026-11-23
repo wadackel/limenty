@@ -194,7 +194,7 @@ fun ThemeCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 12.dp, top = 10.dp, bottom = 10.dp),
+                .padding(start = 12.dp, top = NAME_ROW_PADDING, bottom = NAME_ROW_PADDING),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
@@ -210,7 +210,9 @@ fun ThemeCard(
             LimentyIconButton(
                 contentDescription = "More for ${palette.name}",
                 onClick = onMore,
-                modifier = Modifier.overhangVertically(12.dp),
+                // No further than the row's padding: past it the card's clip cuts the target off,
+                // and a scroll to the button can never bring all of it into view.
+                modifier = Modifier.overhangVertically(NAME_ROW_PADDING),
             ) {
                 Text("···", color = LimentyColors.Text3, fontSize = 18.sp)
             }
@@ -316,3 +318,6 @@ internal fun Modifier.selectedRing(selected: Boolean, shape: Shape = LimentyShap
 private const val FONT_SAMPLE = "❯ ls -laF  0O1lI  {}[]<>=~"
 
 private val CARD_GAP = 10.dp
+
+/** Above and below a theme card's name, and so the furthest its More can hang past the name. */
+private val NAME_ROW_PADDING = 10.dp

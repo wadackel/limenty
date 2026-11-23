@@ -85,8 +85,14 @@ the floating panes read as cards, and fully rounded buttons disagreed with the l
 
 On a 4dp grid. The inside of a surface follows its corner step: 24 inside a floating surface, 16
 inside a surface, 12 inside a small one. Screens keep 16 at each side on the folded display and 20
-on the unfolded one. Anything pressed is at least 44 tall and a row is 56. The key bar is the one
-exception it argues for: its keys are drawn 32 tall in a 44 row, and their hit area takes in the gaps.
+on the unfolded one. Anything pressed is at least 44 tall and a row is 56. The key bar draws less
+than it answers to: its keys are drawn 32 tall in a 44 row, and their hit area takes in the gaps.
+
+Two targets answer to less than 44, each for a reason: the theme editor's sample, whose spans are a
+line tall because it shows a terminal and every colour in it is also a 44-tall swatch, and those
+swatches on the unfolded display, 38 wide where eight share a side panel that stops at 400 to leave
+the sample room. `PressTargetSizeTest` measures the screens the JVM tests draw, every settings
+section and the theme editor, across as well as down, and lets only these two through.
 
 ## Buttons
 

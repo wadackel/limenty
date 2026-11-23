@@ -2,7 +2,6 @@ package dev.wadackel.limenty.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -10,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
@@ -27,11 +27,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.unit.coerceAtLeast
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.wadackel.limenty.ui.theme.LimentyColors
@@ -156,13 +158,16 @@ fun PasswordField(
         keyboardOptions = KeyboardOptions(autoCorrectEnabled = false, keyboardType = KeyboardType.Password),
         visualTransformation = if (revealed) VisualTransformation.None else PasswordVisualTransformation('•'),
         trailing = {
-            Text(
-                text = if (revealed) "Hide" else "Show",
-                style = LimentyText.Label,
-                modifier = Modifier.clickableText(onToggleReveal),
+            // Hung into the field's padding, so the field keeps the height of its two lines rather
+            // than growing to the target's. Measured in sp, so a larger font does not grow it either.
+            val line = with(LocalDensity.current) { LimentyText.Label.lineHeight.toDp() }
+            LimentyTextButton(
+                label = if (revealed) "Hide" else "Show",
+                onClick = onToggleReveal,
+                modifier = Modifier
+                    .offset(x = LimentyTextButtonInset)
+                    .overhangVertically(((LimentySpacing.TouchTarget - line) / 2).coerceAtLeast(0.dp)),
             )
         },
     )
 }
-
-private fun Modifier.clickableText(onClick: () -> Unit) = this.clickable(onClick = onClick)
