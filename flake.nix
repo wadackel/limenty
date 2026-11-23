@@ -33,6 +33,12 @@
             export PATH="$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$ANDROID_HOME/cmdline-tools/latest/bin:$PATH"
           '';
         };
+
+        # Only for tools/sshd. Kept out of the default shell so the build and CI's check job do
+        # not fetch a Python they never run.
+        sshd = pkgs.mkShell {
+          packages = [ (pkgs.python3.withPackages (p: [ p.asyncssh ])) ];
+        };
       });
     };
 }

@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# A test SSH server on 127.0.0.1 for an emulator to reach as 10.0.2.2: password auth, a real
+# shell in a PTY. Runs in the foreground; Ctrl-C stops it. Options: tools/sshd --help.
+set -euo pipefail
+
+root="$(cd "$(dirname "$0")/.." && pwd)"
+# asyncssh comes from the flake's sshd shell, so the version is the one flake.lock pins rather
+# than whatever a package index serves today.
+exec nix develop "$root#sshd" --command python3 "$root/tools/lib/sshd.py" "$@"

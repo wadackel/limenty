@@ -61,9 +61,10 @@ case "${1:-}" in
              adb_ shell run-as "$PKG" cat "files/diagnostics/$f" > "$dest/$f"
              echo "$dest/$f"
            done ;;
-  # Instrumentation reinstalls the app, and reinstalling wipes its data — the saved hosts and
-  # their credentials with it. That is a nuisance on an emulator and a real loss on the phone
-  # someone actually uses, so the target has to be an emulator unless the caller insists.
+  # Instrumentation installs the app and uninstalls it when the tests end, which wipes its data —
+  # the saved hosts and their credentials with it. That is a nuisance on an emulator and a real
+  # loss on the phone someone actually uses, so the target has to be an emulator unless the
+  # caller insists, and even then the run says what it is about to delete.
   itest)   if [ -n "${ANDROID_SERIAL:-}${LIMENTY_AVD:-}" ]; then target=$(target itest) || exit 2
            else target=$(attached | awk '/^emulator-/ {print; exit}'); target="${target:-$(attached | head -1)}"
            fi
@@ -73,16 +74,22 @@ case "${1:-}" in
            case "$target" in
              emulator-*) ;;
              *) if [ "${LIMENTY_ITEST_ALLOW_DEVICE:-}" != "1" ]; then
-                  echo "tools/app itest: refusing to run on '$target' — this reinstalls the app" >&2
-                  echo "  and wipes its saved hosts and credentials. Start an emulator" >&2
+                  echo "tools/app itest: refusing to run on '$target' — this uninstalls the app when" >&2
+                  echo "  the tests end, which wipes its saved hosts and credentials. Start an emulator" >&2
                   echo "  (tools/emu start) or set ANDROID_SERIAL or LIMENTY_AVD to one." >&2
                   echo "  To override anyway: LIMENTY_ITEST_ALLOW_DEVICE=1 tools/app itest" >&2
                   exit 2
                 fi ;;
            esac
+           echo "tools/app itest: on $target, this installs the app over what is there and uninstalls" >&2
+           echo "  it when the tests end, so whatever the app had saved there (hosts, credentials," >&2
+           echo "  settings) is gone afterwards. Finish any manual check on $target first." >&2
            # Anything after `itest` goes to Gradle, so one class can be run while iterating
            # (-Pandroid.testInstrumentationRunnerArguments.class=...) without going around the guard.
            shift
+           # ddmlib reads ANDROID_ADB_SERVER_PORT only when it first starts in a JVM, so a warm
+           # Gradle daemon could still be asking the shared server, which does not have the device.
+           [ -z "${LIMENTY_ADB_PORT:-}" ] || set -- --no-daemon "$@"
            ANDROID_SERIAL="$target" ./gw :app:connectedDebugAndroidTest "$@" ;;
   devices) attached | sed "s|^|  |"; echo "commands use: $(target devices 2>/dev/null || echo '(pick one)')" ;;
   *)       echo "usage: tools/app {build|install|launch|stop|run|log|logf|crash|dump [dir]|itest [gradle args]|devices}" >&2; exit 2 ;;
