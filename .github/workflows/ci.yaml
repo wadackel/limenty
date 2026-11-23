@@ -137,6 +137,20 @@ jobs:
       - name: Test SSH server
         run: nohup tools/sshd --port 2222 --password testpass > "$RUNNER_TEMP/sshd.log" 2>&1 &
 
+      # The emulator, its system image and the AVD with the boot snapshot Gradle takes of it. Without
+      # them the job downloads about 2.5 GB from Google, whose speed varies from run to run, and boots
+      # the emulator cold to take the snapshot: a minute it spends after the APKs are already built.
+      # The key follows the device definition and the AGP version, the inputs that decide all three.
+      - name: Restore the emulator
+        id: emulator-cache
+        uses: actions/cache/restore@v6.1.0
+        with:
+          path: |
+            ~/.config/.android/avd/gradle-managed
+            /usr/local/lib/android/sdk/emulator
+            /usr/local/lib/android/sdk/system-images/android-36/aosp_atd/x86_64
+          key: emulator-${{ runner.os }}-${{ hashFiles('app/build.gradle.kts', 'gradle/libs.versions.toml') }}
+
       # The runner has /dev/kvm but only root may open it; without it the emulator falls back to
       # software emulation, too slow to boot inside the timeout.
       - name: Enable KVM
@@ -154,6 +168,19 @@ jobs:
           nix develop -c ./gradlew :app:ciDebugAndroidTest
           -Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader_indirect
           -Pandroid.testInstrumentationRunnerArguments.sshHost=10.0.2.2
+
+      # Main only, like the Gradle cache, and only after the suite passed on what is being saved.
+      # Gradle checks only a restored snapshot's metadata before booting from it, so one bad inside
+      # would fail every run that restores it; `gh cache delete` with the key above is the way out.
+      - name: Save the emulator
+        if: ${{ success() && github.ref == 'refs/heads/main' && steps.emulator-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v6.1.0
+        with:
+          path: |
+            ~/.config/.android/avd/gradle-managed
+            /usr/local/lib/android/sdk/emulator
+            /usr/local/lib/android/sdk/system-images/android-36/aosp_atd/x86_64
+          key: ${{ steps.emulator-cache.outputs.cache-primary-key }}
 
       # On success too: the per-test times in the results are how a slow test gets found, and a
       # passing run is the only kind that has all of them.
