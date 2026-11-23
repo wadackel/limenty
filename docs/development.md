@@ -81,11 +81,12 @@ CI runs the whole suite as well, on every pull request and push to `main`, in th
 starts `tools/sshd` so `SshOnAndroidTest` connects rather than skips, and keeps the reports when it
 fails. It takes about seven minutes, so `tools/app itest` on one class is still the faster loop.
 
-A test belongs in `androidTest` only when it needs something Robolectric does not have: the
-Android Keystore, a real IME and `InputConnection`, the platform's gesture detectors timing a long
-press, glyphs drawn through the platform's font chain, ART's security providers, or the whole
-activity. Compose layout, semantics and touch input, storage, and `org.json` all run in `src/test`
-under Robolectric, which is where `./gw test` and `check` reach them in seconds.
+A test belongs in `androidTest` only when what it checks is the platform's own behaviour, which
+Robolectric stands in for with a shadow or a host build: the Android Keystore, the key character
+map, a keyboard covering the screen, the view's gesture detectors timing a long press, pixels drawn
+through the device's fonts, ART's security providers, or the whole activity. Compose layout,
+semantics and touch input, storage, and `org.json` all run in `src/test` under Robolectric, where
+`./gw test` and `check` reach them in seconds.
 
 ### A private adb server
 
