@@ -201,3 +201,23 @@ dependencies {
     androidTestImplementation(libs.sshj)
     debugImplementation(libs.compose.ui.test.manifest)
 }
+
+// Robolectric fetches its Android jar from Maven Central itself, inside the test JVM, which puts it
+// outside Gradle's cache and retries: CI downloaded it on every run and failed when the download
+// did. Resolved here instead, it comes from the same cache as every other dependency.
+val robolectricAndroidAll: Configuration by configurations.creating { isTransitive = false }
+
+dependencies {
+    robolectricAndroidAll(libs.robolectric.android.all)
+}
+
+val robolectricJars = tasks.register<Sync>("robolectricJars") {
+    from(robolectricAndroidAll)
+    into(layout.buildDirectory.dir("robolectric-jars"))
+}
+
+tasks.withType<Test>().configureEach {
+    inputs.files(robolectricJars).withPropertyName("robolectricJars").withPathSensitivity(PathSensitivity.NAME_ONLY)
+    systemProperty("robolectric.offline", "true")
+    systemProperty("robolectric.dependency.dir", layout.buildDirectory.dir("robolectric-jars").get().asFile.absolutePath)
+}
