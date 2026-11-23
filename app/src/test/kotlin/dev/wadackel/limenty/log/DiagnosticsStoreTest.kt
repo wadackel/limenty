@@ -1,8 +1,8 @@
 package dev.wadackel.limenty.log
 
+import android.app.Application
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
-import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import dev.wadackel.limenty.core.common.log.LogTags
 import dev.wadackel.limenty.core.common.log.TermLog
@@ -10,6 +10,8 @@ import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 import java.io.File
 
 /**
@@ -17,7 +19,8 @@ import java.io.File
  * that is not attached to a debugger. That means the events leading up to it, what was running,
  * and — since a terminal carries passwords — nothing that was typed.
  */
-@RunWith(AndroidJUnit4::class)
+@RunWith(RobolectricTestRunner::class)
+@Config(application = Application::class, sdk = [35])
 class DiagnosticsStoreTest {
     private val context: Context = ApplicationProvider.getApplicationContext()
     private val directory = File(context.filesDir, "diagnostics")

@@ -1,8 +1,8 @@
 package dev.wadackel.limenty.data
 
+import android.app.Application
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
-import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import dev.wadackel.limenty.core.input.Gesture
 import dev.wadackel.limenty.core.input.GestureBehaviour
@@ -17,12 +17,15 @@ import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
 /**
  * Everything the settings screen offers is remembered, and a stored value that
  * no longer makes sense cannot take the rest of the configuration down with it.
  */
-@RunWith(AndroidJUnit4::class)
+@RunWith(RobolectricTestRunner::class)
+@Config(application = Application::class, sdk = [35])
 class TerminalSettingsTest {
     private val context: Context = ApplicationProvider.getApplicationContext()
 

@@ -1,8 +1,8 @@
 package dev.wadackel.limenty.data
 
+import android.app.Application
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
-import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import dev.wadackel.limenty.core.transport.HostKeyInfo
 import kotlinx.coroutines.runBlocking
@@ -10,13 +10,16 @@ import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 import java.io.File
 
 /**
  * A host key accepted once is trusted next time, and a key that later disagrees has to
  * be distinguishable from it. That decision outlives the process, so it is stored and reread.
  */
-@RunWith(AndroidJUnit4::class)
+@RunWith(RobolectricTestRunner::class)
+@Config(application = Application::class, sdk = [35])
 class AndroidKnownHostsStoreTest {
     private val context: Context = ApplicationProvider.getApplicationContext()
 

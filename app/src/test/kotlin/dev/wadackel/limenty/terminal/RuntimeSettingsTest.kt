@@ -3,7 +3,6 @@ package dev.wadackel.limenty.terminal
 import android.content.Context
 import android.view.View
 import androidx.test.core.app.ApplicationProvider
-import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.google.common.truth.Truth.assertThat
 import dev.wadackel.limenty.core.input.Gesture
@@ -24,6 +23,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emptyFlow
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 /**
  * Everything the settings screen offers can be changed mid-session
@@ -31,7 +33,9 @@ import org.junit.runner.RunWith
  * reaches the session at all — it changes the cell, so the terminal is a different size — and
  * even that has to keep the history it already had.
  */
-@RunWith(AndroidJUnit4::class)
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [35], qualifiers = "w673dp-h841dp-420dpi")
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 class RuntimeSettingsTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
 

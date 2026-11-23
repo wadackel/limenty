@@ -26,8 +26,15 @@ import dev.wadackel.limenty.ui.theme.LimentyTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 /** Finding a colour, changing it and taking the change back, driven through the editor itself. */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [35], qualifiers = "w673dp-h841dp-420dpi")
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 class ThemeEditorTest {
     @get:Rule
     val rule = createComposeRule()

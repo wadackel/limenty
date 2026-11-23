@@ -10,18 +10,22 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
-import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 /**
  * What the window asks of the platform when the app comes back. Whether the keyboard then opens is
  * the platform's doing and is observed on a device; this only pins the request.
  */
-@RunWith(AndroidJUnit4::class)
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [35], qualifiers = "w673dp-h841dp-420dpi")
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 class KeyboardRestoreEffectTest {
     @get:Rule
     val rule = createAndroidComposeRule<ComponentActivity>()

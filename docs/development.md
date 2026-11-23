@@ -75,6 +75,18 @@ app's data on that emulator is gone afterwards; it says so before it starts. Arg
 tools/app itest -Pandroid.testInstrumentationRunnerArguments.class=dev.wadackel.limenty.transport.SshOnAndroidTest
 ```
 
+CI runs the whole suite as well, on every pull request and push to `main`, in the
+`instrumentation` job beside `check`. It boots a Gradle-managed emulator (`ci` in
+`app/build.gradle.kts`, the same `7.6in Foldable` profile as `tools/emu create`, on an ATD image),
+starts `tools/sshd` so `SshOnAndroidTest` connects rather than skips, and keeps the reports when it
+fails. It takes about seven minutes, so `tools/app itest` on one class is still the faster loop.
+
+A test belongs in `androidTest` only when it needs something Robolectric does not have: the
+Android Keystore, a real IME and `InputConnection`, the platform's gesture detectors timing a long
+press, glyphs drawn through the platform's font chain, ART's security providers, or the whole
+activity. Compose layout, semantics and touch input, storage, and `org.json` all run in `src/test`
+under Robolectric, which is where `./gw test` and `check` reach them in seconds.
+
 ### A private adb server
 
 The shared adb server on port 5037 can crash every minute or so (see

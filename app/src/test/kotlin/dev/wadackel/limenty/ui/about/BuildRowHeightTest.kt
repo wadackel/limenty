@@ -12,6 +12,10 @@ import androidx.compose.ui.unit.dp
 import dev.wadackel.limenty.ui.theme.LimentyTheme
 import org.junit.Rule
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 /**
  * The Version, Build and Commit lines under the mark copy their value when pressed, so each is a
@@ -19,6 +23,9 @@ import org.junit.Test
  * their text and sat against each other, so a press near the line between them could copy the
  * other value; the screenshot does not show that, the bounds do.
  */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [35], qualifiers = "w673dp-h841dp-420dpi")
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 class BuildRowHeightTest {
     @get:Rule
     val rule = createComposeRule()

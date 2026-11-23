@@ -18,6 +18,10 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 /**
  * Where on the bar a tap lands, measured by tapping.
@@ -27,6 +31,9 @@ import org.junit.Test
  * gap were. Compose's own touch-target expansion is left at its default, because that is what the
  * app runs with and it already carries a 32dp key most of the way across a narrow gap.
  */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [35], qualifiers = "w673dp-h841dp-420dpi")
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 class AuxiliaryKeyBarReachTest {
     @get:Rule
     val rule = createComposeRule()
