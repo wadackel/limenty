@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, ci/instrumentation]
   pull_request:
     branches: [main]
 
@@ -77,5 +77,60 @@ jobs:
           path: |
             **/build/reports/
             **/build/test-results/
+          retention-days: 7
+          if-no-files-found: ignore
+
+  # A job of its own rather than more steps in `check`: booting an emulator and running the suite
+  # takes longer than everything in `check` together, and side by side neither waits on the other.
+  instrumentation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: $/.github/actions/setup-nix
+      - uses: gradle/actions/setup-gradle@v6.4.1
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+
+      # The runner has /dev/kvm but only root may open it; without it the emulator falls back to
+      # software emulation, too slow to boot inside the timeout.
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      # For SshOnAndroidTest's end-to-end case, which skips without a server. The password is
+      # fixed because the runner is a throwaway machine nothing else reaches; tools/sshd itself
+      # picks a random one for a reason that holds on a developer's machine.
+      - name: Test SSH server
+        run: |
+          nohup tools/sshd --port 2222 --password testpass > "$RUNNER_TEMP/sshd.log" 2>&1 &
+          for _ in $(seq 120); do
+            if (exec 3<>/dev/tcp/127.0.0.1/2222) 2>/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat "$RUNNER_TEMP/sshd.log"
+          exit 1
+
+      # A Gradle-managed emulator (`ci` in app/build.gradle.kts): Gradle downloads the image,
+      # boots it, runs the suite and shuts it down, so there is no emulator action to pin.
+      # The software renderer because the runner has no GPU.
+      - name: Instrumentation tests
+        run: >-
+          nix develop -c ./gradlew :app:ciDebugAndroidTest
+          -Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader_indirect
+          -Pandroid.testInstrumentationRunnerArguments.sshHost=10.0.2.2
+
+      - name: Reports
+        if: failure()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: instrumentation-reports
+          path: |
+            app/build/reports/androidTests/
+            app/build/outputs/androidTest-results/
+            ${{ runner.temp }}/sshd.log
           retention-days: 7
           if-no-files-found: ignore
