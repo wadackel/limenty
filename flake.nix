@@ -21,12 +21,14 @@
           # gradle/wrapper/gradle-wrapper.properties, and a second copy on PATH invites builds
           # that silently run a different one.
           packages = [
-            pkgs.jdk17
+            # Headless: nothing here opens a window, and on Linux the full JDK brings GTK and X11
+            # with it, which CI downloads on every run. On macOS both names are the same Zulu build.
+            pkgs.jdk17_headless
             pkgs.ktlint
           ];
 
           shellHook = ''
-            export JAVA_HOME="${pkgs.jdk17}"
+            export JAVA_HOME="${pkgs.jdk17_headless}"
             export ANDROID_HOME="''${ANDROID_HOME:-$HOME/Library/Android/sdk}"
             export ANDROID_SDK_ROOT="$ANDROID_HOME"
             export GRADLE_USER_HOME="''${GRADLE_USER_HOME:-$HOME/.gradle}"
