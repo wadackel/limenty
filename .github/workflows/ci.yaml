@@ -154,6 +154,7 @@ jobs:
           nix develop -c ./gradlew :app:ciDebugAndroidTest
           -Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader_indirect
           -Pandroid.testInstrumentationRunnerArguments.sshHost=10.0.2.2
+          -Pandroid.testInstrumentationRunnerArguments.class=dev.wadackel.limenty.ui.ExpSlowOpenTest
 
       # On success too: the per-test times in the results are how a slow test gets found, and a
       # passing run is the only kind that has all of them.
