@@ -6,9 +6,9 @@ format, module table — lives in [`docs/development.md`](docs/development.md) a
 
 ## Never run instrumentation tests on the physical device
 
-Instrumentation reinstalls the app, and reinstalling wipes its data — the owner's saved hosts and
-their credentials with it. On the phone they actually use, that is a real loss and they have to
-type a password back in.
+Instrumentation installs the app and uninstalls it when the tests end, and uninstalling wipes its
+data — the owner's saved hosts and their credentials with it. On the phone they actually use, that
+is a real loss and they have to type a password back in.
 
 ```sh
 tools/emu start                 # then
@@ -19,6 +19,14 @@ tools/app itest                 # refuses anything that is not an emulator
 possible to reach around it by calling Gradle directly — don't. If a check genuinely needs the
 physical device (a sensor, a peripheral, a display the emulator has no equivalent for), say so and
 ask, rather than spending the owner's saved state on it.
+
+The emulator loses its app data the same way, and `tools/app itest` says so before it starts.
+Finish any check that depends on what the app has saved there (a host you added, a theme you
+set up) before running it, not after.
+
+`tools/dev` is the phone's tool and refuses when `ANDROID_SERIAL` or `LIMENTY_AVD` names an
+emulator, since it would otherwise ignore them and act on the phone. Reach an emulator through
+`tools/app` and `tools/emu`.
 
 ## Check on the phone when the owner can lend it
 
@@ -107,6 +115,11 @@ adb: device offline
   picking a device (`LIMENTY_ADB_WAIT`, 30s by default), and they name a device instead of letting
   adb refuse because the phone and the emulator are both attached.
 - **Run adb-using commands one at a time.** Parallel ones are what lose the start-up race.
+- **Move a long run to a private adb server.** When the shared one keeps falling over, start the
+  emulator and run the tests with `LIMENTY_ADB_PORT=5047` set on both (see
+  [`docs/development.md`](docs/development.md#a-private-adb-server)). That server has mDNS and USB
+  off, so it does not hit the panic and does not see the phone. Do not switch mDNS off for the
+  shared server instead: the phone reaches it over mDNS.
 
 ## Prefer evidence the code cannot fabricate
 

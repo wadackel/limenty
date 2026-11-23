@@ -43,7 +43,8 @@ tools/emu fold | unfold       # drive the hinge sensor
 tools/emu rotate 0|1|2|3      # force a display rotation (rotate-auto restores)
 tools/emu shot out.png        # screenshot
 tools/app run                 # assemble + install + launch the debug build
-tools/app itest               # instrumentation tests (emulator only — see AGENTS.md)
+tools/app itest               # instrumentation tests (emulator only, wipes the app's data there)
+tools/sshd [--port 2222]      # a test SSH server for the emulator, at 10.0.2.2
 tools/app log | logf          # app-emitted structured log lines (once / follow)
 tools/app crash               # the platform crash buffer
 tools/app dump [dir]          # pull the on-device diagnostics reports
@@ -56,13 +57,69 @@ Several devices are usually attached at once — an emulator, the phone over the
 over the network — so `tools/app` names one rather than letting adb pick, and says so when the
 choice is not obvious. `ANDROID_SERIAL` settles it, and `LIMENTY_AVD=<avd>` settles it by the
 emulator's AVD name, which stays the same when serials change with start order; `tools/dev`
-always means the phone. Before picking, they wait for adb's device list to settle (up to
-`LIMENTY_ADB_WAIT` seconds, 30 by default), since a freshly restarted adb server lists devices
-over its first second.
+always means the phone, and refuses to run when either of them names an emulator. Before
+picking, they wait for adb's device list to settle (up to `LIMENTY_ADB_WAIT` seconds, 30 by
+default), since a freshly restarted adb server lists devices over its first second.
 
 The AVD is a `7.6in Foldable` profile with a hinge sensor and `hw.keyboard=yes`, so fold,
 rotation and physical-key paths can be exercised without the real device. `tools/emu create`
-reproduces that configuration from scratch.
+reproduces that configuration from scratch. `tools/emu start` passes `-crash-report-mode never`:
+with crash reports left from an earlier run, the emulator otherwise stops at "Showing crashdialog
+to get consent" and never boots.
+
+`tools/app itest` installs the app, runs `connectedDebugAndroidTest`, and uninstalls it, so the
+app's data on that emulator is gone afterwards; it says so before it starts. Arguments after
+`itest` go to Gradle, which is how one class is run while iterating:
+
+```sh
+tools/app itest -Pandroid.testInstrumentationRunnerArguments.class=dev.wadackel.limenty.transport.SshOnAndroidTest
+```
+
+### A private adb server
+
+The shared adb server on port 5037 can crash every minute or so (see
+[`AGENTS.md`](../AGENTS.md#adbs-server-crashes-on-its-own)), and a run of the whole
+instrumentation suite does not survive that. `LIMENTY_ADB_PORT=<port>` moves `tools/*` onto a
+server of their own on that port, with mDNS, USB and the emulator port scan switched off.
+`tools/emu start` then puts the emulator on a port from 5600 up, which the shared server does not
+scan, so the emulator is attached to the private server alone:
+
+```sh
+LIMENTY_ADB_PORT=5047 tools/emu start
+LIMENTY_ADB_PORT=5047 tools/app itest
+LIMENTY_ADB_PORT=5047 tools/emu stop
+```
+
+The setting has to be on `tools/emu start` as well as on the commands after it; an emulator that
+was started without it is attached to the shared server, and `tools/emu` says so. The phone is
+not on the private server, so `tools/dev` finds nothing there. Leave mDNS on for the shared server:
+the phone is attached through it.
+
+### A test SSH server
+
+`tools/sshd` runs an SSH server on `127.0.0.1` with password authentication and a real shell in a
+PTY, for an emulator to reach as `10.0.2.2` (the emulator's alias for the host's loopback). It
+answers to `tester` on port 2222 with a new random password each time it starts, printed on its
+first line; `--user`, `--password` and `--port` change them. It runs in the foreground until
+Ctrl-C. asyncssh comes from the flake's `sshd` shell.
+
+The shell runs as you, on this machine. Its home and working directory are a temporary directory
+that is deleted when the server stops, and it gets none of your environment beyond `PATH` and your
+user name, but anything typed into it still runs with your permissions. Anything that reaches this
+machine's loopback can try the password, which is why it is not a fixed one.
+
+`SshOnAndroidTest` connects to it when given its address, and skips the end-to-end check without
+one. Its password defaults to `testpass`:
+
+```sh
+tools/sshd --port 2222 --password testpass &
+tools/app itest -Pandroid.testInstrumentationRunnerArguments.class=dev.wadackel.limenty.transport.SshOnAndroidTest \
+  -Pandroid.testInstrumentationRunnerArguments.sshHost=10.0.2.2
+```
+
+`sshPort`, `sshUser` and `sshPassword` are the other arguments, defaulting to 2222, `tester` and
+`testpass`. The embedded echo server, `./gw :core:transport:runTestSshServer -PsshPort=2222`,
+answers to those credentials too, but listens on every interface rather than loopback alone.
 
 ## Documentation screenshots
 

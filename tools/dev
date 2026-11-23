@@ -4,6 +4,19 @@
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
+
+# tools/app and tools/emu take ANDROID_SERIAL and LIMENTY_AVD to name an emulator; this script
+# picks the phone whatever they say, so a command aimed at an emulator would land on the phone
+# instead (`run` replaces the app there). Refused before adb is touched at all.
+refuse_emulator() {
+  echo "tools/dev: refusing, $1=$2 names an emulator and tools/dev only drives the phone." >&2
+  echo "  For the emulator use tools/app or tools/emu ($1=$2 tools/app run);" >&2
+  echo "  for the phone, unset $1." >&2
+  exit 2
+}
+case "${ANDROID_SERIAL:-}" in emulator-*) refuse_emulator ANDROID_SERIAL "$ANDROID_SERIAL" ;; esac
+[ -z "${LIMENTY_AVD:-}" ] || refuse_emulator LIMENTY_AVD "$LIMENTY_AVD"
+
 . tools/lib/adb.sh
 adb_settle
 SERIAL="${LIMENTY_DEVICE:-$("$ADB" devices | awk '$2=="device" && $1 !~ /^emulator-/ {print $1; exit}')}"

@@ -4,6 +4,22 @@
 ANDROID_HOME="${ANDROID_HOME:-$HOME/Library/Android/sdk}"
 ADB="$ANDROID_HOME/platform-tools/adb"
 
+# LIMENTY_ADB_PORT=<port> moves every tool onto a private adb server on that port, one with mDNS,
+# USB and the emulator port scan switched off. It sees only the emulators tools/emu starts under
+# the same setting, so it does not crash in mDNS the way the shared server on 5037 does, and the
+# phone is not on it. The variables go to the environment because whichever adb or
+# emulator process starts first, Gradle's included, has to see the same ones.
+if [ -n "${LIMENTY_ADB_PORT:-}" ]; then
+  # 5037 is the shared server: restarting it with mDNS off would drop the phone from it.
+  if [ "$LIMENTY_ADB_PORT" = 5037 ]; then
+    echo "LIMENTY_ADB_PORT=5037 is the shared adb server; pick another port (5047)" >&2
+    exit 2
+  fi
+  export ANDROID_ADB_SERVER_PORT="$LIMENTY_ADB_PORT" ADB_MDNS=0 ADB_USB=0
+  # Below the first emulator port (5555), so the scan covers nothing.
+  export ADB_LOCAL_TRANSPORT_MAX_PORT=5553
+fi
+
 # The adb server in platform-tools 37 aborts on its own (a panic in its mDNS discovery, or losing
 # a start-up race), and a restarted one lists devices over the next second, the emulator as
 # `offline` first. Picking a device in that window picks the wrong one or finds none. A server

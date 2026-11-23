@@ -67,9 +67,12 @@ class SshOnAndroidTest {
     }
 
     /**
-     * End-to-end against the embedded server on the developer machine:
-     * `./gw :core:transport:runTestSshServer -PsshPort=2222`, then run the instrumentation with
-     * `-Pandroid.testInstrumentationRunnerArguments.sshHost=10.0.2.2`.
+     * End-to-end against a test server on the developer machine, which an emulator reaches as
+     * 10.0.2.2: `tools/sshd --password testpass` (a real shell in a PTY) or the embedded echo
+     * server, `./gw :core:transport:runTestSshServer -PsshPort=2222`, which answers to tester /
+     * testpass. Then run the instrumentation with
+     * `-Pandroid.testInstrumentationRunnerArguments.sshHost=10.0.2.2` (and `.sshPort=<port>` for a
+     * port other than 2222, `.sshPassword=<password>` for another password).
      */
     @Test
     fun connectsToATestServerWhenOneIsReachable() = runBlocking {
@@ -84,7 +87,7 @@ class SshOnAndroidTest {
                 host = host!!,
                 port = port,
                 username = arguments.getString("sshUser") ?: "tester",
-                password = arguments.getString("sshPassword") ?: "correct horse",
+                password = arguments.getString("sshPassword") ?: "testpass",
                 initialColumns = 80,
                 initialRows = 24,
                 connectTimeoutMillis = 15_000,
