@@ -69,6 +69,11 @@ android {
     }
 
     testOptions {
+        // Off for every instrumented run. On CI's software renderer a screen transition kept the
+        // main thread drawing for about seven seconds, and Espresso waits until it stops, so each
+        // test that opened a screen spent most of its time there. The tests wait for the screen
+        // they expect rather than for a transition to end, so they check the same thing either way.
+        animationsDisabled = true
         unitTests {
             isIncludeAndroidResources = true
             isReturnDefaultValues = true
