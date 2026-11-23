@@ -51,7 +51,7 @@ jobs:
       # shellHook takes it rather than overriding it.
       #
       # `:app`'s unit tests are excluded from the release variant: `test` would otherwise run the
-      # same 46 tests twice, and the release variant differs only by minification, which a unit
+      # same tests twice, and the release variant differs only by minification, which a unit
       # test never reaches.
       #
       # The throughput benchmark is left in. It asserts absolute rates on a shared runner, which is
