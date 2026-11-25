@@ -106,7 +106,12 @@ section and the theme editor, across as well as down, and lets only these two th
   `Resume` next to `Add host` was the case the rule above is for.
 - **Secondary actions are icons or a menu.** Edit, Disconnect and Delete sit behind `···` on a card
   and as icon buttons in the detail pane.
-- **Text-only buttons close or cancel.** Deletion is confirmed in a dialog, in `Danger`.
+- **Text-only buttons close or cancel.** Deletion is confirmed in a dialog, in `Danger`, except
+  where Undo can bring the thing back: a single key on the key bar is removed at once with Undo in
+  a snackbar, and a key group is confirmed only when keys would go with it.
+- **One sheet for an edit, never a box over a box.** A key or a key group is edited in a sheet from
+  the bottom edge, where a group opens into its keys with `‹ group` to go back. What is edited there
+  is kept only on Save; leaving with changes asks "Discard changes?", inside the sheet.
 
 ## Layout per display
 

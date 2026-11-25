@@ -32,19 +32,44 @@ data class KeySet(
     }
 
     /**
-     * Takes the key at [member] out of [edited] and places it right after the group at [group].
+     * Applies what the editing sheet left of one slot, and says where the slot ended up: the group
+     * it went into when it went into one.
      *
-     * The group is given rather than read from the set because it is the one being edited: the
-     * key may exist only in that edit, added or moved since the group was last saved, and the rest
-     * of the edit is kept with it.
+     * A slot that stays in its row keeps its place there, with any keys taken out of it placed
+     * right after it. One that changes rows goes to the end of the other, as a pin always has.
      */
-    fun moveOutOfGroup(group: SlotPosition, edited: KeyGroup, member: Int): KeySet {
-        val slots = row(group.pinned)
-        if (slots.getOrNull(group.index) !is KeyGroup) return this
-        val moving = edited.keys.getOrNull(member) ?: return this
-        val shrunk = edited.copy(keys = edited.keys.filterIndexed { at, _ -> at != member })
-        val updated = slots.replaced(group.index, shrunk).toMutableList().also { it.add(group.index + 1, moving) }
-        return withRow(group.pinned, updated)
+    fun applying(edit: SlotEdit): Pair<KeySet, SlotPosition> {
+        val from = edit.from?.takeIf { it.index in row(it.pinned).indices }
+        val key = edit.slot as? AuxiliaryKey
+        val into = edit.into
+        val group = into?.let { row(it.pinned).getOrNull(it.index) as? KeyGroup }
+        if (key != null && into != null && group != null) {
+            // Grown before the key is taken out, so the group's index still means the same slot.
+            val grown = withRow(into.pinned, row(into.pinned).replaced(into.index, group.copy(keys = group.keys + key)))
+            if (from == null) return grown to into
+            val landed = if (from.pinned == into.pinned && from.index < into.index) into.copy(index = into.index - 1) else into
+            return grown.removed(from) to landed
+        }
+        val placed = listOf(edit.slot) + edit.movedOut
+        if (from != null && from.pinned == edit.pinned) {
+            val slots = row(from.pinned).toMutableList().also {
+                it.removeAt(from.index)
+                it.addAll(from.index, placed)
+            }
+            return withRow(from.pinned, slots) to from
+        }
+        val emptied = if (from != null) removed(from) else this
+        val end = emptied.row(edit.pinned).size
+        return emptied.withRow(edit.pinned, emptied.row(edit.pinned) + placed) to SlotPosition(edit.pinned, end)
+    }
+
+    fun removed(at: SlotPosition): KeySet = withRow(at.pinned, row(at.pinned).filterIndexed { index, _ -> index != at.index })
+
+    /** Puts [slot] back at [at], or at the end of its row when the row has since grown shorter. */
+    fun restored(at: SlotPosition, slot: KeyBarSlot): KeySet {
+        val slots = row(at.pinned).toMutableList()
+        slots.add(at.index.coerceIn(0, slots.size), slot)
+        return withRow(at.pinned, slots)
     }
 
     /** Moves the scrolling slot at [index] to the end of the pinned run, where it is drawn last. */
@@ -91,6 +116,21 @@ data class KeySet(
         }.getOrNull()?.takeIf { it.isNotEmpty() }
     }
 }
+
+/**
+ * One slot as the editing sheet leaves it, applied all at once on Save so that Cancel can throw
+ * every part of it away: what the slot is, which row it ends in, and the keys taken out of it.
+ */
+data class SlotEdit(
+    /** Where the slot was, or null for one being added. */
+    val from: SlotPosition?,
+    val slot: KeyBarSlot,
+    /** The row it ends in, unless [into] names a group for a key to go into instead. */
+    val pinned: Boolean,
+    val into: SlotPosition? = null,
+    /** Keys taken out of a group in the same edit, placed right after it. */
+    val movedOut: List<AuxiliaryKey> = emptyList(),
+)
 
 /**
  * A slot by where it sits in a set rather than by what it holds. Two slots can be equal (a second
