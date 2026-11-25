@@ -322,6 +322,8 @@ fun KeyBarSettingsScreen(
                         // `selected` is left as it is: clamped against the shorter list it already
                         // names the set that slid into this place, or the new last one.
                         onChange { it.removeKeySet(index) }
+                        // Undo names its set by place, and the places after this one have just moved.
+                        removed = null
                         deleting = false
                     },
                     color = LimentyColors.Danger,

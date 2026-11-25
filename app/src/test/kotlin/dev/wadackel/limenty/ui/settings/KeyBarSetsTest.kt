@@ -162,6 +162,22 @@ class KeyBarSetsTest {
         assertEquals(listOf("Yyy"), preferences.keySets[1].scrolling.map { it.label })
     }
 
+    /** The key's set has moved up a place, so an Undo still offered would put it in the next one. */
+    @Test
+    fun deletingASetTakesBackTheUndoOfAKeyRemovedFromAnother() {
+        show(listOf(vim, agent, tmux))
+
+        fromMenu("Agent")
+        press("Xxx")
+        press("Remove key")
+        fromMenu("Vim")
+        fromMenu("Delete")
+        press("Delete")
+
+        rule.onNode(hasText("Undo")).assertDoesNotExist()
+        assertEquals(listOf(agent.copy(scrolling = agent.scrolling.drop(1)), tmux), preferences.keySets)
+    }
+
     @Test
     fun deletingTheSetInUseLeavesAValidSetInUseAndOnScreen() {
         show(listOf(vim, agent, tmux), active = 2)
