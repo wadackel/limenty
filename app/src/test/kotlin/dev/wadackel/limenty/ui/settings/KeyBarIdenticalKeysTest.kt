@@ -7,9 +7,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.isEnabled
+import androidx.compose.ui.test.isSelectable
 import androidx.compose.ui.test.isSelected
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onLast
@@ -73,7 +77,10 @@ class KeyBarIdenticalKeysTest {
 
         // The last `Esc` that answers a tap is the second chip of the scrolling row.
         press("Esc")
+        // Its step, chosen so that the next key replaces it, then Alt held for that key.
+        rule.onNode(hasContentDescription("Escape") and isSelectable() and hasAnyAncestor(isDialog())).performClick()
         press("Alt")
+        rule.onNode(hasContentDescription("Alt Escape")).performClick()
         press("Save")
 
         val altEsc = AuxiliaryKey("⌥Esc", key = TerminalKey.Escape, modifiers = Modifiers(Modifiers.ALT))

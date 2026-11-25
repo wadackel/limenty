@@ -1,26 +1,25 @@
 package dev.wadackel.limenty.ui.settings
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.selection.toggleable
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -30,17 +29,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import dev.wadackel.limenty.core.input.KeyStep
 import dev.wadackel.limenty.core.input.Modifiers
 import dev.wadackel.limenty.core.input.TerminalKey
 import dev.wadackel.limenty.data.AuxiliaryKey
-import dev.wadackel.limenty.ui.components.LimentyChevron
-import dev.wadackel.limenty.ui.components.LimentyDialog
-import dev.wadackel.limenty.ui.components.LimentyDialogActions
-import dev.wadackel.limenty.ui.components.LimentyDialogGap
 import dev.wadackel.limenty.ui.components.LimentyField
 import dev.wadackel.limenty.ui.components.LimentyTextButton
 import dev.wadackel.limenty.ui.components.SectionHeading
@@ -54,144 +51,223 @@ import dev.wadackel.limenty.ui.theme.LimentySpacing
 import dev.wadackel.limenty.ui.theme.LimentyText
 
 /**
- * Edits what a key bar button or a gesture sends: a row of steps, and the fields of the selected one.
+ * Builds what a key bar key or a gesture sends, by pressing keys rather than choosing from a list.
  *
- * Both editors use this one so a sequence is built the same way wherever it is sent from. What
- * each step can be — a named key, a character, text, with Ctrl, Alt or Shift — is the encoder's
- * vocabulary, offered as a picker rather than typed so nothing here can name what it cannot send.
+ * The steps are pressed on a small keyboard of the terminal's own keys, with Ctrl, Alt and Shift
+ * held for the next key the way extra-keys rows do it: `⌃b c` is Ctrl, b, c. A list of every action
+ * asked what kind of thing a step was — a named key, a character, text — before it asked which, and
+ * then wanted the character typed in a second field and its modifiers in a third. What kind it is
+ * now follows from what was pressed.
  *
- * [steps] is never empty; the caller starts from one empty step, which is what nothing chosen yet
- * looks like.
+ * Above the keyboard, a field takes a character or a key's name, for when typing `pgd` is quicker
+ * than finding the key. Text goes in through "Text…", to one side, because it is rarely wanted.
+ *
+ * Both editors use this one, so a sequence is built the same way wherever it is sent from.
  */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun KeyStepsEditor(steps: List<KeyStep>, onStepsChange: (List<KeyStep>) -> Unit) {
-    var selected by remember { mutableIntStateOf(0) }
-    var keyMenuOpen by remember { mutableStateOf(false) }
+    // The step the next key replaces; null adds the next key at the end.
+    var selected by remember { mutableStateOf<Int?>(null) }
+    var held by remember { mutableStateOf(Modifiers.None) }
+    var tab by remember { mutableStateOf(KeyTab.Keys) }
+    var typed by remember { mutableStateOf("") }
     val order = rememberReorderState<KeyStep>()
+    val at = selected?.takeIf { it in steps.indices }
 
-    val at = selected.coerceIn(0, steps.lastIndex)
-    val step = steps[at]
-    val replace: (KeyStep) -> Unit = { edited -> onStepsChange(steps.toMutableList().also { it[at] = edited }) }
+    val put: (KeyStep) -> Unit = { step ->
+        onStepsChange(if (at != null) steps.toMutableList().also { it[at] = step } else steps + step)
+        selected = null
+        held = Modifiers.None
+    }
+    val press: (TerminalKey?, Int) -> Unit = { key, codePoint -> put(KeyStep.Press(key, codePoint, held)) }
+    val suggestions = keySuggestions(typed)
+    val takeSuggestion: (KeyStep.Press) -> Unit = { suggestion ->
+        press(suggestion.key, suggestion.codePoint)
+        typed = ""
+    }
 
-    Column(verticalArrangement = Arrangement.spacedBy(LimentyDialogGap)) {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                // Centred rather than bottom-aligned: the button beside the heading is a 44dp
-                // touch target and the heading is eleven point text, so a shared baseline leaves
-                // the two reading as separate rows.
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                SectionHeading("Sends", modifier = Modifier.weight(1f))
-                LimentyTextButton(
-                    label = "Remove step",
-                    onClick = {
-                        onStepsChange(steps.toMutableList().also { it.removeAt(at) })
-                        selected = at.coerceAtMost(steps.lastIndex - 1)
-                    },
-                    // Not Danger: the step only leaves a draft the dialog's Cancel still throws away.
-                    color = LimentyColors.Text2,
-                    enabled = steps.size > 1,
-                )
-            }
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        SectionHeading("Sends")
+        Row(verticalAlignment = Alignment.Top) {
             FlowRow(
                 modifier = Modifier
-                    .fillMaxWidth()
+                    .weight(1f)
                     .reorderGroup(order, steps) { moved ->
-                        // The selection follows the step it was on rather than the position it
-                        // occupied, or dragging one step would silently start editing another.
-                        selected = moved.indexOfFirst { it === steps[at] }.coerceAtLeast(0)
+                        // The selection follows the step it was on rather than the place it held.
+                        selected = at?.let { from -> moved.indexOfFirst { it === steps[from] }.takeIf { it >= 0 } }
                         onStepsChange(moved)
                     },
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                steps.forEachIndexed { index, entry ->
+                if (steps.isEmpty()) {
+                    Box(modifier = Modifier.heightIn(min = 44.dp), contentAlignment = Alignment.CenterStart) {
+                        Text("Press keys below", style = LimentyText.Secondary, color = LimentyColors.Text3)
+                    }
+                }
+                steps.forEachIndexed { index, step ->
                     StepChip(
-                        name = stepName(entry),
-                        spoken = spokenStep(entry),
+                        name = stepName(step),
+                        spoken = spokenStep(step),
                         selected = index == at,
-                        dragged = order.dragging == index,
-                        onClick = { selected = index },
-                        modifier = Modifier.reorderable(order, index, steps.size, spokenStep(entry)),
-                    )
-                }
-                AddStepChip(
-                    onClick = {
-                        onStepsChange(steps + KeyStep.Press())
-                        selected = steps.size
-                    },
-                )
-            }
-        }
-
-        Box {
-            PickerRow(
-                label = "Action",
-                value = actionName(step),
-                onClick = { keyMenuOpen = true },
-            )
-            DropdownMenu(expanded = keyMenuOpen, onDismissRequest = { keyMenuOpen = false }) {
-                DropdownMenuItem(
-                    text = { Text("Character") },
-                    onClick = {
-                        replace(KeyStep.Press(codePoint = codePointOf(step), modifiers = modifiersOf(step)))
-                        keyMenuOpen = false
-                    },
-                )
-                DropdownMenuItem(
-                    text = { Text("Text") },
-                    onClick = {
-                        replace(KeyStep.Literal((step as? KeyStep.Literal)?.text ?: ""))
-                        keyMenuOpen = false
-                    },
-                )
-                TerminalKey.entries.forEach { candidate ->
-                    DropdownMenuItem(
-                        text = { Text(candidate.name) },
-                        onClick = {
-                            replace(KeyStep.Press(key = candidate, modifiers = modifiersOf(step)))
-                            keyMenuOpen = false
-                        },
+                        lifted = order.dragging == index,
+                        onClick = { selected = if (index == at) null else index },
+                        modifier = Modifier.reorderable(order, index, steps.size, spokenStep(step)),
                     )
                 }
             }
-        }
-
-        when {
-            step is KeyStep.Literal -> LimentyField(
-                label = "Text",
-                value = step.text,
-                onValueChange = { replace(KeyStep.Literal(it)) },
-                placeholder = "sent as typed",
-            )
-            step is KeyStep.Press && step.key == null -> LimentyField(
-                label = "Character",
-                value = if (step.codePoint > 0) String(Character.toChars(step.codePoint)) else "",
-                // Two, for a character that takes two units to write rather than for two
-                // characters: what is stored is the one code point they spell.
-                onValueChange = { typed ->
-                    val text = typed.take(2)
-                    replace(step.copy(codePoint = if (text.isEmpty()) 0 else text.codePointAt(0)))
+            DeleteStep(
+                which = if (at != null) "selected" else "last",
+                enabled = steps.isNotEmpty(),
+                onClick = {
+                    val gone = at ?: steps.lastIndex
+                    onStepsChange(steps.filterIndexed { index, _ -> index != gone })
+                    selected = null
                 },
-                placeholder = "one character",
+            )
+        }
+        if (steps.isNotEmpty()) {
+            Text(
+                "Sends " + steps.joinToString(", then ") { spokenStep(it) },
+                style = LimentyText.Secondary,
+                color = LimentyColors.Text3,
             )
         }
 
-        if (step is KeyStep.Press) {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                SectionHeading("Held with it")
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    ModifierChip("Ctrl", Modifiers.CTRL, step.modifiers) { replace(step.copy(modifiers = it)) }
-                    ModifierChip("Alt", Modifiers.ALT, step.modifiers) { replace(step.copy(modifiers = it)) }
-                    ModifierChip("Shift", Modifiers.SHIFT, step.modifiers) { replace(step.copy(modifiers = it)) }
+        (at?.let { steps[it] } as? KeyStep.Literal)?.let { literal ->
+            LimentyField(
+                label = "Text, sent as typed",
+                value = literal.text,
+                onValueChange = { text -> onStepsChange(steps.toMutableList().also { it[at!!] = KeyStep.Literal(text) }) },
+            )
+        }
+
+        LimentyField(
+            label = "Type a key or character",
+            value = typed,
+            onValueChange = { typed = it },
+            placeholder = "c, pgd, f5, esc",
+            // Ascii asks the keyboard for its Latin layout, where a name like `pgd` is typed, rather
+            // than for a composing one that holds letters back until they are converted.
+            keyboardOptions = KeyboardOptions(
+                capitalization = KeyboardCapitalization.None,
+                autoCorrectEnabled = false,
+                keyboardType = KeyboardType.Ascii,
+                imeAction = ImeAction.Done,
+            ),
+            keyboardActions = KeyboardActions(onDone = { suggestions.firstOrNull()?.let(takeSuggestion) }),
+        )
+        if (typed.isNotEmpty()) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                if (suggestions.isEmpty()) {
+                    Box(modifier = Modifier.heightIn(min = 44.dp), contentAlignment = Alignment.CenterStart) {
+                        Text("No key by that name", style = LimentyText.Secondary, color = LimentyColors.Text3)
+                    }
+                }
+                suggestions.forEachIndexed { index, suggestion ->
+                    val step = suggestion.copy(modifiers = held)
+                    KeyCap(
+                        label = stepName(step),
+                        spoken = "Add ${spokenStep(step)}",
+                        ringed = index == 0,
+                        onClick = { takeSuggestion(suggestion) },
+                    )
+                }
+            }
+        }
+
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            HeldModifier("Ctrl", Modifiers.CTRL, held) { held = it }
+            HeldModifier("Alt", Modifiers.ALT, held) { held = it }
+            HeldModifier("Shift", Modifiers.SHIFT, held) { held = it }
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(modifier = Modifier.weight(1f).selectableGroup(), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                KeyTab.entries.forEach { entry -> TabChip(entry.title, selected = entry == tab, onClick = { tab = entry }) }
+            }
+            LimentyTextButton("Text…", onClick = {
+                put(KeyStep.Literal(""))
+                selected = if (at != null) at else steps.size
+            })
+        }
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            when (tab) {
+                KeyTab.Keys, KeyTab.Function -> tab.keys.forEach { key ->
+                    val step = KeyStep.Press(key = key, modifiers = held)
+                    KeyCap(stepName(step), spokenStep(step), onClick = { press(key, 0) })
+                }
+                KeyTab.Letters, KeyTab.Symbols -> tab.characters.forEach { character ->
+                    val step = KeyStep.Press(codePoint = character.code, modifiers = held)
+                    KeyCap(stepName(step), spokenStep(step), onClick = { press(null, character.code) })
                 }
             }
         }
     }
 }
+
+/** The keyboard's pages. Letters and symbols are characters; the rest are the terminal's named keys. */
+private enum class KeyTab(val title: String, val keys: List<TerminalKey> = emptyList(), val characters: List<Char> = emptyList()) {
+    Keys(
+        "Keys",
+        keys = listOf(
+            TerminalKey.Escape, TerminalKey.Tab, TerminalKey.Enter, TerminalKey.Backspace, TerminalKey.Space,
+            TerminalKey.Insert, TerminalKey.Delete, TerminalKey.Home, TerminalKey.End, TerminalKey.PageUp,
+            TerminalKey.PageDown, TerminalKey.ArrowLeft, TerminalKey.ArrowUp, TerminalKey.ArrowDown, TerminalKey.ArrowRight,
+        ),
+    ),
+    Letters("abc", characters = ('a'..'z').toList()),
+    Symbols("123 #", characters = ('0'..'9').toList() + "`-=[]\\;',./~!@#$%^&*()_+{}|:\"<>?".toList()),
+    Function("F1–12", keys = TerminalKey.entries.filter { it.name.matches(Regex("F\\d+")) }),
+}
+
+/**
+ * What the field offers for [typed]: the character itself when one character was typed, then every
+ * named key one of whose names starts with it — `pgd` for PgDn, `f1` for F1 and F10 to F12, `esc`
+ * for Escape. A key whose name matches outright comes first.
+ */
+internal fun keySuggestions(typed: String): List<KeyStep.Press> {
+    if (typed.isEmpty()) return emptyList()
+    val single = typed.codePointCount(0, typed.length) == 1
+    val query = typed.trim().lowercase().replace(" ", "")
+    val named = if (query.isEmpty()) {
+        emptyList()
+    } else {
+        TerminalKey.entries
+            .mapNotNull { key ->
+                val names = namesOf(key)
+                when {
+                    query in names -> key to 0
+                    names.any { it.startsWith(query) } -> key to 1
+                    else -> null
+                }
+            }
+            .sortedBy { it.second }
+            .map { KeyStep.Press(key = it.first) }
+    }
+    val character = if (single && typed.isNotBlank()) listOf(KeyStep.Press(codePoint = typed.codePointAt(0))) else emptyList()
+    return character + named
+}
+
+/** Every name a key answers to in the field: its own, its face, how it is said, and the usual short forms. */
+private fun namesOf(key: TerminalKey): Set<String> = buildSet {
+    add(key.name.lowercase())
+    add(AuxiliaryKey.labelFor(key, 0, Modifiers.None).lowercase())
+    add(AuxiliaryKey.spokenFor(key, 0, Modifiers.None).lowercase().replace(" ", ""))
+    addAll(ALIASES[key].orEmpty())
+}
+
+private val ALIASES = mapOf(
+    TerminalKey.Enter to listOf("return", "ret", "cr"),
+    TerminalKey.Backspace to listOf("bs", "bksp"),
+    TerminalKey.Delete to listOf("del"),
+    TerminalKey.Space to listOf("spc"),
+    TerminalKey.PageUp to listOf("pgup"),
+    TerminalKey.PageDown to listOf("pgdn"),
+    TerminalKey.ArrowUp to listOf("up"),
+    TerminalKey.ArrowDown to listOf("down"),
+    TerminalKey.ArrowLeft to listOf("left"),
+    TerminalKey.ArrowRight to listOf("right"),
+)
 
 /**
  * Every step, not just the selected one: a step left unconfigured sends nothing, and a sequence
@@ -199,138 +275,114 @@ internal fun KeyStepsEditor(steps: List<KeyStep>, onStepsChange: (List<KeyStep>)
  */
 internal fun sendsEveryStep(steps: List<KeyStep>): Boolean = steps.isNotEmpty() && steps.all { it.toEvent() != null }
 
-/** What the picker calls the step it is editing. */
-private fun actionName(step: KeyStep): String = when (step) {
-    is KeyStep.Literal -> "Text"
-    is KeyStep.Press -> step.key?.name ?: "Character"
-}
-
-private fun codePointOf(step: KeyStep): Int = (step as? KeyStep.Press)?.codePoint ?: 0
-
-private fun modifiersOf(step: KeyStep): Modifiers = (step as? KeyStep.Press)?.modifiers ?: Modifiers.None
-
-/** A step with nothing chosen yet has no name; it still needs a chip to be selected by. */
+/** Text with nothing in it yet still needs a chip to be selected by. */
 private fun stepName(step: KeyStep): String = AuxiliaryKey.labelFor(listOf(step)).ifEmpty { "—" }
 
 /** The chip shows `⌃s`; a screen reader should hear `Ctrl s`. */
-private fun spokenStep(step: KeyStep): String = AuxiliaryKey.spokenFor(listOf(step)).ifEmpty { "—" }
+private fun spokenStep(step: KeyStep): String = AuxiliaryKey.spokenFor(listOf(step)).ifEmpty { if (step is KeyStep.Literal) "Empty text" else "—" }
 
-/**
- * One step, in the order it is sent.
- *
- * Drawn as a key, like the modifier chips and like the keys on the bar itself, because that is what
- * it stands for. The selected one is the one the fields below the row are about, so it is marked
- * the same way a held modifier is.
- */
+/** One step, in the order it is sent. The selected one is what the next key pressed replaces. */
 @Composable
 private fun StepChip(
     name: String,
     spoken: String,
     selected: Boolean,
-    dragged: Boolean,
+    lifted: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Box(
-        modifier = modifier
+        modifier = Modifier
+            .selectable(selected = selected, role = Role.Button, onClick = onClick)
+            .then(modifier)
             .heightIn(min = 44.dp)
             .defaultMinSize(minWidth = 44.dp)
+            .widthIn(max = 200.dp)
             .clip(LimentyShapes.Surface)
             .background(LimentyColors.Surface2)
-            .selectedRing(selected || dragged)
-            .clickable(role = Role.Button, onClick = onClick)
+            .selectedRing(selected || lifted)
             .padding(horizontal = 12.dp)
             .semantics(mergeDescendants = true) { contentDescription = spoken },
         contentAlignment = Alignment.Center,
     ) {
         Text(
             name,
-            color = if (selected) LimentyColors.Accent else LimentyColors.Text2,
+            color = if (selected) LimentyColors.Accent else LimentyColors.Text,
             style = AuxiliaryKeyBarMetrics.labelStyle(),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }
 
-/** Dashed, so it reads as a place for a step rather than as a step that sends `+`. */
 @Composable
-private fun AddStepChip(onClick: () -> Unit) {
+private fun DeleteStep(which: String, enabled: Boolean, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .heightIn(min = LimentySpacing.TouchTarget)
+            .defaultMinSize(minWidth = LimentySpacing.TouchTarget)
+            .clip(LimentyShapes.Surface)
+            .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+            .semantics { contentDescription = "Delete $which step" },
+        contentAlignment = Alignment.Center,
+    ) {
+        Text("⌫", style = AuxiliaryKeyBarMetrics.labelStyle(), color = if (enabled) LimentyColors.Text2 else LimentyColors.Text3)
+    }
+}
+
+/** A key on the editor's keyboard, drawn as a key. */
+@Composable
+private fun KeyCap(label: String, spoken: String, onClick: () -> Unit, ringed: Boolean = false) {
     Box(
         modifier = Modifier
             .heightIn(min = 44.dp)
             .defaultMinSize(minWidth = 44.dp)
-            .dashedOutline(LimentyColors.Line, LimentyShapes.Surface)
             .clip(LimentyShapes.Surface)
+            .background(LimentyColors.Surface4)
+            .selectedRing(ringed)
             .clickable(role = Role.Button, onClick = onClick)
-            .padding(horizontal = 12.dp),
+            .padding(horizontal = 10.dp)
+            .semantics(mergeDescendants = true) { contentDescription = spoken },
         contentAlignment = Alignment.Center,
     ) {
-        Text("+", style = LimentyText.Label, fontSize = 16.sp, fontFamily = FontFamily.Monospace)
+        Text(label, color = LimentyColors.Text, style = AuxiliaryKeyBarMetrics.labelStyle(), maxLines = 1)
     }
 }
 
 /**
- * A choice, shaped like the field above it.
- *
- * Every measurement here is [LimentyField]'s, because the two sit one under the other and a picker
- * that merely resembles a field is worse than one that does not: the eye reads the difference as a
- * mistake rather than as a distinction.
+ * A modifier held for the next key and let go after it, the way a phone's shift key works: pressed
+ * first, so the key it goes with is chosen the same way whether it is held or not.
  */
 @Composable
-private fun PickerRow(label: String, value: String, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(LimentyShapes.Surface)
-            .background(LimentyColors.Surface2)
-            .clickable(role = Role.Button, onClick = onClick)
-            .padding(horizontal = LimentySpacing.SurfacePadding, vertical = 12.dp),
-        verticalAlignment = Alignment.Bottom,
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
-            Text(label, style = LimentyText.Secondary)
-            Text(
-                value,
-                color = LimentyColors.Text,
-                fontSize = 15.sp,
-                fontFamily = FontFamily.Monospace,
-            )
-        }
-        Box(modifier = Modifier.height(20.dp), contentAlignment = Alignment.Center) {
-            LimentyChevron(12.dp, 90f, LimentyColors.Text3)
-        }
-    }
-}
-
-/**
- * One modifier, held or not.
- *
- * Drawn as a key rather than written as a word: what it stands for is a key held down, and three
- * bare words said nothing about which of them were on beyond the colour they were printed in.
- */
-@Composable
-private fun ModifierChip(label: String, bit: Int, current: Modifiers, onChange: (Modifiers) -> Unit) {
+private fun HeldModifier(label: String, bit: Int, current: Modifiers, onChange: (Modifiers) -> Unit) {
     val held = current.bits and bit != 0
     Box(
         modifier = Modifier
             .heightIn(min = 44.dp)
-            .defaultMinSize(minWidth = 72.dp)
+            .defaultMinSize(minWidth = 64.dp)
             .clip(LimentyShapes.Surface)
-            .background(LimentyColors.Surface2)
+            .background(if (held) LimentyColors.AccentSelection else LimentyColors.Surface4)
             .selectedRing(held)
-            .toggleable(
-                value = held,
-                role = Role.Checkbox,
-                onValueChange = { onChange(Modifiers(current.bits xor bit)) },
-            )
+            .toggleable(value = held, role = Role.Checkbox, onValueChange = { onChange(Modifiers(current.bits xor bit)) })
             .padding(horizontal = 12.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(
-            label,
-            color = if (held) LimentyColors.Accent else LimentyColors.Text2,
-            fontSize = 14.sp,
-            fontFamily = FontFamily.Monospace,
-        )
+        Text(label, color = if (held) LimentyColors.Accent else LimentyColors.Text2, style = AuxiliaryKeyBarMetrics.labelStyle())
+    }
+}
+
+@Composable
+private fun TabChip(label: String, selected: Boolean, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .heightIn(min = LimentySpacing.TouchTarget)
+            .defaultMinSize(minWidth = LimentySpacing.TouchTarget)
+            .clip(LimentyShapes.Surface)
+            .background(if (selected) LimentyColors.Surface5 else LimentyColors.Surface3)
+            .selectable(selected = selected, role = Role.Tab, onClick = onClick)
+            .padding(horizontal = 10.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(label, style = LimentyText.Label, color = if (selected) LimentyColors.Text else LimentyColors.Text2, maxLines = 1)
     }
 }

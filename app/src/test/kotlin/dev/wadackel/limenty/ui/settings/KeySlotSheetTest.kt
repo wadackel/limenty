@@ -11,6 +11,7 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasSetTextAction
@@ -90,6 +91,7 @@ class KeySlotSheetTest {
         press("+ Group")
         rule.onNode(hasSetTextAction()).performTextInput("nav")
         rule.onAllNodes(hasContentDescription("Add key")).onLast().performClick()
+        rule.onNode(hasContentDescription("Escape") and hasClickAction() and hasAnyAncestor(isDialog())).performClick()
         rule.waitForIdle()
         // On the new key's own page, not the group's.
         rule.onNode(hasText("Label")).assertExists()

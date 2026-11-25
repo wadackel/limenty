@@ -226,7 +226,7 @@ private fun GestureKeysDialog(
     onDismiss: () -> Unit,
     onSave: (List<KeyStep>) -> Unit,
 ) {
-    var steps by remember { mutableStateOf(initial.ifEmpty { listOf(KeyStep.Press()) }) }
+    var steps by remember { mutableStateOf(initial) }
     LimentyDialog(title = gesture.displayName, onDismissRequest = onDismiss) {
         Text("Custom keys", style = LimentyText.Secondary, color = LimentyColors.Text2)
         KeyStepsEditor(steps = steps, onStepsChange = { steps = it })

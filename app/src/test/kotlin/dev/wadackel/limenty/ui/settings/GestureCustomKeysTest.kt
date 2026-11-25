@@ -15,6 +15,7 @@ import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -75,9 +76,8 @@ class GestureCustomKeysTest {
         show()
         rule.onNodeWithText("Double tap").performClick()
         rule.onNodeWithText("Custom keys…").performClick()
-        rule.onNodeWithText("Action").performClick()
-        rule.onNodeWithText("Tab").performClick()
         rule.onNodeWithText("Shift").performClick()
+        rule.onNodeWithContentDescription("Shift Tab").performClick()
         rule.onNodeWithText("Save").performClick()
         rule.waitForIdle()
 
