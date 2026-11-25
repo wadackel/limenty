@@ -91,6 +91,9 @@ class KeySlotSheetTest {
         rule.onNode(hasSetTextAction()).performTextInput("nav")
         rule.onAllNodes(hasContentDescription("Add key")).onLast().performClick()
         rule.waitForIdle()
+        // On the new key's own page, not the group's.
+        rule.onNode(hasText("Label")).assertExists()
+        rule.onNode(hasText("Name")).assertDoesNotExist()
         backTo("nav")
         press("Save")
 

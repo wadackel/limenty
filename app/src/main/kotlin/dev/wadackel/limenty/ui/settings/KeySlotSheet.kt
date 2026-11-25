@@ -236,9 +236,10 @@ internal fun KeySlotSheet(
                         page = index
                     },
                     onAdd = {
+                        val added = members.size
                         members = members + KeyDraft.of(AuxiliaryKey(label = "", key = TerminalKey.Escape))
                         takenOut = null
-                        page = members.size
+                        page = added
                     },
                 ) {
                     PositionChoice(pinned = pinned, onPinnedChange = { pinned = it })
