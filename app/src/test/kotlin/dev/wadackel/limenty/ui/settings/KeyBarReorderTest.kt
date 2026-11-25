@@ -12,9 +12,11 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.isEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onFirst
@@ -233,6 +235,7 @@ class KeyBarReorderTest {
         show(wrapping)
         rule.onNode(hasContentDescription("Add key")).performClick()
         rule.waitForIdle()
+        rule.onNode(hasContentDescription("Escape") and hasClickAction() and hasAnyAncestor(isDialog())).performClick()
         rule.onAllNodes(hasText("Save") and hasClickAction() and isEnabled()).onLast().performClick()
         rule.waitForIdle()
 

@@ -126,4 +126,15 @@ class KeyStepsEditorTest {
 
         assertEquals(listOf(char('c'), KeyStep.Literal("ls")), steps)
     }
+
+    /** `ls` then Enter: the key pressed after the text goes after it rather than over it. */
+    @Test
+    fun aKeyPressedAfterTypingTextIsAddedAfterIt() {
+        show()
+        tap("Text…")
+        rule.onNode(hasSetTextAction() and hasText("Text, sent as typed")).performTextInput("ls")
+        tap("Enter")
+
+        assertEquals(listOf(KeyStep.Literal("ls"), KeyStep.Press(key = TerminalKey.Enter)), steps)
+    }
 }

@@ -68,6 +68,10 @@ import dev.wadackel.limenty.ui.theme.LimentyText
 internal fun KeyStepsEditor(steps: List<KeyStep>, onStepsChange: (List<KeyStep>) -> Unit) {
     // The step the next key replaces; null adds the next key at the end.
     var selected by remember { mutableStateOf<Int?>(null) }
+    // The text step just added from "Text…", whose field stays open while it is typed into. Held
+    // apart from the selection, so the key pressed after the text goes after it: `ls` then ⏎ is
+    // what text is usually for, and a selection would have let the ⏎ replace the `ls`.
+    var writing by remember { mutableStateOf<Int?>(null) }
     var held by remember { mutableStateOf(Modifiers.None) }
     var tab by remember { mutableStateOf(KeyTab.Keys) }
     var typed by remember { mutableStateOf("") }
@@ -77,6 +81,7 @@ internal fun KeyStepsEditor(steps: List<KeyStep>, onStepsChange: (List<KeyStep>)
     val put: (KeyStep) -> Unit = { step ->
         onStepsChange(if (at != null) steps.toMutableList().also { it[at] = step } else steps + step)
         selected = null
+        writing = null
         held = Modifiers.None
     }
     val press: (TerminalKey?, Int) -> Unit = { key, codePoint -> put(KeyStep.Press(key, codePoint, held)) }
@@ -111,7 +116,10 @@ internal fun KeyStepsEditor(steps: List<KeyStep>, onStepsChange: (List<KeyStep>)
                         spoken = spokenStep(step),
                         selected = index == at,
                         lifted = order.dragging == index,
-                        onClick = { selected = if (index == at) null else index },
+                        onClick = {
+                            selected = if (index == at) null else index
+                            writing = null
+                        },
                         modifier = Modifier.reorderable(order, index, steps.size, spokenStep(step)),
                     )
                 }
@@ -123,6 +131,7 @@ internal fun KeyStepsEditor(steps: List<KeyStep>, onStepsChange: (List<KeyStep>)
                     val gone = at ?: steps.lastIndex
                     onStepsChange(steps.filterIndexed { index, _ -> index != gone })
                     selected = null
+                    writing = null
                 },
             )
         }
@@ -134,11 +143,12 @@ internal fun KeyStepsEditor(steps: List<KeyStep>, onStepsChange: (List<KeyStep>)
             )
         }
 
-        (at?.let { steps[it] } as? KeyStep.Literal)?.let { literal ->
+        val textAt = (writing ?: at)?.takeIf { steps.getOrNull(it) is KeyStep.Literal }
+        if (textAt != null) {
             LimentyField(
                 label = "Text, sent as typed",
-                value = literal.text,
-                onValueChange = { text -> onStepsChange(steps.toMutableList().also { it[at!!] = KeyStep.Literal(text) }) },
+                value = (steps[textAt] as KeyStep.Literal).text,
+                onValueChange = { text -> onStepsChange(steps.toMutableList().also { it[textAt] = KeyStep.Literal(text) }) },
             )
         }
 
@@ -186,8 +196,9 @@ internal fun KeyStepsEditor(steps: List<KeyStep>, onStepsChange: (List<KeyStep>)
                 KeyTab.entries.forEach { entry -> TabChip(entry.title, selected = entry == tab, onClick = { tab = entry }) }
             }
             LimentyTextButton("Text…", onClick = {
+                val into = at ?: steps.size
                 put(KeyStep.Literal(""))
-                selected = if (at != null) at else steps.size
+                writing = into
             })
         }
         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
