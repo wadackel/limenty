@@ -300,6 +300,30 @@ class AuxiliaryKeyBarGroupTest {
         assertTrue("a key went past the top: ${all.minOf { it.top }}", all.all { it.top >= 0f })
     }
 
+    /** A frame at a time, the way the screen would draw it, so the fade is seen part way. */
+    private fun frames(count: Int) = repeat(count) { rule.mainClock.advanceTimeByFrame() }
+
+    /** The keys stay drawn for the length of the fade, then go. */
+    @Test
+    fun thePopupFadesOutAfterAKeyIsSent() {
+        show()
+        node("sym, 3 keys").performClick()
+        rule.waitForIdle()
+
+        rule.mainClock.autoAdvance = false
+        node("-").performClick()
+        val drawn = (1..20).map {
+            frames(1)
+            shown("|")
+        }
+
+        assertFalse(groups.isOpen)
+        // Gone at once, it would last a single frame; the fade is 80ms, about five.
+        assertTrue("drawn for ${drawn.count { it }} frames", drawn.count { it } >= 4)
+        assertFalse(drawn.last())
+        assertEquals(listOf("-"), pressed)
+    }
+
     @Test
     fun anEmptyGroupOpensNothing() {
         show(scrolling = listOf(KeyGroup("sym", emptyList()), esc))

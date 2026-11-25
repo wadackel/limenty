@@ -5,6 +5,7 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -236,9 +237,9 @@ class KeyGroupPopupState internal constructor() {
         open = OpenKeyGroup(group, anchorX, owner)
     }
 
+    /** [underFinger] is left as it was, so the key just sent stays lit while the popup fades. */
     fun close() {
         open = null
-        underFinger = null
         memberBounds.clear()
     }
 
@@ -598,39 +599,57 @@ private suspend fun PointerInputScope.detectGroupPress(
  * neither resizes the terminal nor reflows the session. The catcher sits under the popup and over
  * everything else: a tap outside only closes it, the way a tap around the terminal's other overlays
  * does not reach the terminal either.
+ *
+ * Closing plays the opening backwards, so the popup does not blink out. Only the drawing lingers:
+ * the catcher and the keys stop answering the moment it closes, so a touch made while it fades goes
+ * where it would with nothing open.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun KeyGroupLayer(popup: KeyGroupPopupState, placement: BarPlacement, onKeyPressed: (AuxiliaryKey) -> Unit) {
-    val open = popup.open ?: return
+    val open = popup.open
+    var last by remember { mutableStateOf<OpenKeyGroup?>(null) }
+    val rise = remember { Animatable(0f) }
+    LaunchedEffect(open) {
+        if (open != null) {
+            last = open
+            rise.snapTo(0f)
+            rise.animateTo(1f, tween(POPUP_RISE_MILLIS, easing = LinearOutSlowInEasing))
+        } else {
+            rise.animateTo(0f, tween(POPUP_RISE_MILLIS, easing = FastOutLinearInEasing))
+            last = null
+        }
+    }
+    val shown = open ?: last ?: return
     if (placement.root == IntSize.Zero) return
+    val answering = open != null
     val haptics = LocalHapticFeedback.current
     val topInset = WindowInsets.safeDrawing.getTop(LocalDensity.current)
-    val rise = remember(open) { Animatable(0f) }
-    LaunchedEffect(open) { rise.animateTo(1f, tween(POPUP_RISE_MILLIS, easing = LinearOutSlowInEasing)) }
     Box(
         modifier = Modifier.layout { measurable, _ ->
             val layer = measurable.measure(Constraints.fixed(placement.root.width, placement.root.height))
             layout(0, 0) { layer.place(-placement.origin.x.roundToInt(), -placement.origin.y.roundToInt()) }
         },
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                // Hit but not handled past closing, so the rest of the touch goes nowhere.
-                .pointerInput(popup) {
-                    awaitEachGesture {
-                        awaitFirstDown(requireUnconsumed = false)
-                        popup.close()
-                    }
-                },
-        )
+        if (answering) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    // Hit but not handled past closing, so the rest of the touch goes nowhere.
+                    .pointerInput(popup) {
+                        awaitEachGesture {
+                            awaitFirstDown(requireUnconsumed = false)
+                            popup.close()
+                        }
+                    },
+            )
+        }
         FlowRow(
             modifier = Modifier
                 .layout { measurable, constraints ->
                     val margin = POPUP_MARGIN.roundToPx()
                     val panel = measurable.measure(Constraints(maxWidth = (constraints.maxWidth - margin * 2).coerceAtLeast(0)))
-                    val x = (open.anchorX - panel.width / 2f).roundToInt()
+                    val x = (shown.anchorX - panel.width / 2f).roundToInt()
                         .coerceIn(margin, (constraints.maxWidth - margin - panel.width).coerceAtLeast(margin))
                     // Over the bar rather than past the top of the screen when there are more rows
                     // than room above it: a group never scrolls, so every key has to stay on screen.
@@ -645,15 +664,15 @@ private fun KeyGroupLayer(popup: KeyGroupPopupState, placement: BarPlacement, on
                 .shadow(POPUP_ELEVATION, POPUP_SHAPE)
                 .background(LimentyColors.Surface3, POPUP_SHAPE)
                 // The panel's own edge takes a touch too, rather than letting it fall to the catcher.
-                .pointerInput(Unit) {}
+                .then(if (answering) Modifier.pointerInput(Unit) {} else Modifier)
                 .padding(POPUP_PADDING),
         ) {
-            open.group.keys.forEachIndexed { index, member ->
+            shown.group.keys.forEachIndexed { index, member ->
                 Box(
                     modifier = Modifier
                         .height(KEY_HEIGHT + KEY_GAP)
-                        .onGloballyPositioned { popup.memberBounds[index] = it }
-                        .clickable(role = Role.Button) {
+                        .onGloballyPositioned { if (popup.isOpen) popup.memberBounds[index] = it }
+                        .clickable(enabled = answering, role = Role.Button) {
                             haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             popup.close()
                             onKeyPressed(member)
