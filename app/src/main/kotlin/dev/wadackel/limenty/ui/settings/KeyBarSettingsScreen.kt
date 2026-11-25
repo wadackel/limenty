@@ -57,6 +57,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.wadackel.limenty.core.input.TerminalKey
 import dev.wadackel.limenty.data.AuxiliaryKey
+import dev.wadackel.limenty.data.KeyBarSlot
+import dev.wadackel.limenty.data.KeyGroup
 import dev.wadackel.limenty.data.KeySet
 import dev.wadackel.limenty.data.TerminalPreferences
 import dev.wadackel.limenty.ui.components.LimentyDialog
@@ -69,6 +71,7 @@ import dev.wadackel.limenty.ui.components.reorderGroup
 import dev.wadackel.limenty.ui.components.reorderable
 import dev.wadackel.limenty.ui.terminal.AuxiliaryKeyBar
 import dev.wadackel.limenty.ui.terminal.AuxiliaryKeyBarMetrics
+import dev.wadackel.limenty.ui.terminal.keyGroupMark
 import dev.wadackel.limenty.ui.theme.LimentyColors
 import dev.wadackel.limenty.ui.theme.LimentyShapes
 import dev.wadackel.limenty.ui.theme.LimentySpacing
@@ -97,18 +100,19 @@ fun KeyBarSettingsScreen(
     val set = sets[index]
     val pinned = set.pinned
     val scrolling = set.scrolling
-    val onPinnedChange: (List<AuxiliaryKey>) -> Unit = { keys -> onChange { it.updateKeySet(index) { s -> s.copy(pinned = keys) } } }
-    val onScrollingChange: (List<AuxiliaryKey>) -> Unit = { keys -> onChange { it.updateKeySet(index) { s -> s.copy(scrolling = keys) } } }
+    val onPinnedChange: (List<KeyBarSlot>) -> Unit = { keys -> onChange { it.updateKeySet(index) { s -> s.copy(pinned = keys) } } }
+    val onScrollingChange: (List<KeyBarSlot>) -> Unit = { keys -> onChange { it.updateKeySet(index) { s -> s.copy(scrolling = keys) } } }
     var naming by remember { mutableStateOf<SetNaming?>(null) }
     var deleting by remember { mutableStateOf(false) }
 
     var editing by remember { mutableStateOf<KeySlot?>(null) }
     var removing by remember { mutableStateOf<KeySlot?>(null) }
     var adding by remember { mutableStateOf(false) }
+    var addingGroup by remember { mutableStateOf(false) }
     // Per set: a drag state keeps the slots it measured by position, and the next set's keys are
     // somewhere else.
-    val pinnedOrder = key(index) { rememberReorderState<AuxiliaryKey>() }
-    val scrollingOrder = key(index) { rememberReorderState<AuxiliaryKey>() }
+    val pinnedOrder = key(index) { rememberReorderState<KeyBarSlot>() }
+    val scrollingOrder = key(index) { rememberReorderState<KeyBarSlot>() }
     val setOrder = rememberReorderState<KeySet>()
 
     BoxWithConstraints(
@@ -222,7 +226,8 @@ fun KeyBarSettingsScreen(
                         modifier = Modifier.reorderable(scrollingOrder, index, scrolling.size, key.spoken()),
                     )
                 }
-                AddChip(onClick = { adding = true })
+                AddChip("Add key", onClick = { adding = true })
+                AddChip("Add group", onClick = { addingGroup = true })
             }
         }
     }
@@ -232,34 +237,34 @@ fun KeyBarSettingsScreen(
         val onRowChange = if (slot.pinned) onPinnedChange else onScrollingChange
         val key = row.getOrNull(slot.index) ?: return@let
         val withoutKey = row.filterIndexed { at, _ -> at != slot.index }
-        AuxiliaryKeyDialog(
-            initial = key,
-            onDismiss = { editing = null },
-            onSave = { updated ->
-                onRowChange(row.mapIndexed { at, it -> if (at == slot.index) updated else it })
+        val onSave: (KeyBarSlot) -> Unit = { updated ->
+            onRowChange(row.mapIndexed { at, it -> if (at == slot.index) updated else it })
+            editing = null
+        }
+        val placement = KeyPlacement(
+            pinned = slot.pinned,
+            onTogglePin = {
+                onRowChange(withoutKey)
+                if (slot.pinned) onScrollingChange(scrolling + key) else onPinnedChange(pinned + key)
                 editing = null
             },
-            placement = KeyPlacement(
-                pinned = slot.pinned,
-                onTogglePin = {
-                    onRowChange(withoutKey)
-                    if (slot.pinned) onScrollingChange(scrolling + key) else onPinnedChange(pinned + key)
-                    editing = null
-                },
-                onRemove = {
-                    editing = null
-                    removing = slot
-                },
-            ),
+            onRemove = {
+                editing = null
+                removing = slot
+            },
         )
+        when (key) {
+            is AuxiliaryKey -> AuxiliaryKeyDialog(initial = key, onDismiss = { editing = null }, onSave = onSave, placement = placement)
+            is KeyGroup -> KeyGroupDialog(initial = key, onDismiss = { editing = null }, onSave = onSave, placement = placement)
+        }
     }
 
     removing?.let { slot ->
         val row = if (slot.pinned) pinned else scrolling
         val onRowChange = if (slot.pinned) onPinnedChange else onScrollingChange
         val key = row.getOrNull(slot.index) ?: return@let
-        LimentyDialog(title = "Remove key", onDismissRequest = { removing = null }) {
-            Text("${key.label.ifBlank { key.spoken() }} will be removed.", style = LimentyText.Body, color = LimentyColors.Text2)
+        LimentyDialog(title = if (key is KeyGroup) "Remove group" else "Remove key", onDismissRequest = { removing = null }) {
+            Text(removalNote(key), style = LimentyText.Body, color = LimentyColors.Text2)
             LimentyDialogActions {
                 LimentyTextButton("Cancel", { removing = null }, color = LimentyColors.Text2)
                 LimentyTextButton(
@@ -283,6 +288,17 @@ fun KeyBarSettingsScreen(
             onSave = { added ->
                 onScrollingChange(scrolling + added)
                 adding = false
+            },
+        )
+    }
+
+    if (addingGroup) {
+        KeyGroupDialog(
+            initial = KeyGroup(name = "", keys = emptyList()),
+            onDismiss = { addingGroup = false },
+            onSave = { added ->
+                onScrollingChange(scrolling + added)
+                addingGroup = false
             },
         )
     }
@@ -326,6 +342,16 @@ fun KeyBarSettingsScreen(
 }
 
 private enum class SetNaming { Rename, Duplicate }
+
+/** A group's keys go with it, so the confirmation says so rather than leaving it to be found out. */
+internal fun removalNote(slot: KeyBarSlot): String {
+    val name = slot.label.ifBlank { slot.spoken() }
+    return when {
+        slot !is KeyGroup || slot.keys.isEmpty() -> "$name will be removed."
+        slot.keys.size == 1 -> "$name and the key in it will be removed."
+        else -> "$name and the ${slot.keys.size} keys in it will be removed."
+    }
+}
 
 /**
  * A key by where it sits rather than by what it is. Two keys can be equal (Add key starts as the
@@ -377,7 +403,7 @@ private fun SetTab(
  * Over the limit is a warning, not a refusal: the main display has room the cover does not.
  */
 @Composable
-private fun FitNote(pinned: List<AuxiliaryKey>, modifier: Modifier = Modifier) {
+private fun FitNote(pinned: List<KeyBarSlot>, modifier: Modifier = Modifier) {
     val measurer = rememberTextMeasurer()
     val density = LocalDensity.current
     val metrics = AuxiliaryKeyBarMetrics
@@ -424,7 +450,7 @@ internal fun fitReading(run: Dp, room: Dp): String {
 
 @Composable
 private fun PinnedRow(
-    key: AuxiliaryKey,
+    key: KeyBarSlot,
     dragged: Boolean,
     onEdit: () -> Unit,
     modifier: Modifier = Modifier,
@@ -447,7 +473,7 @@ private fun PinnedRow(
         DragGrip()
         // The label in both places said the same word twice and answered nothing; the spoken name
         // is the half the face cannot carry.
-        KeySample(key.label)
+        KeySample(key.label, marked = key is KeyGroup)
         Text(
             key.spoken(),
             style = LimentyText.Body,
@@ -481,7 +507,7 @@ private fun DragGrip() {
  */
 @Composable
 private fun ScrollingChip(
-    key: AuxiliaryKey,
+    key: KeyBarSlot,
     dragged: Boolean,
     onEdit: () -> Unit,
     modifier: Modifier = Modifier,
@@ -494,6 +520,7 @@ private fun ScrollingChip(
             .defaultMinSize(minWidth = 44.dp)
             .clip(LimentyShapes.Surface)
             .background(LimentyColors.Surface3)
+            .then(if (key is KeyGroup) Modifier.keyGroupMark() else Modifier)
             .selectedRing(dragged)
             .padding(horizontal = 12.dp)
             .semantics(mergeDescendants = true) { contentDescription = key.spoken() },
@@ -508,7 +535,7 @@ private fun ScrollingChip(
  * one goes rather than as a key that sends `+`.
  */
 @Composable
-private fun AddChip(onClick: () -> Unit) {
+private fun AddChip(label: String, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .height(44.dp)
@@ -520,13 +547,13 @@ private fun AddChip(onClick: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text("+", style = LimentyText.Label)
-        Text("Add key", style = LimentyText.Label)
+        Text(label, style = LimentyText.Label)
     }
 }
 
 /** The key drawn as the bar draws it, at the size a list can carry. */
 @Composable
-private fun KeySample(label: String) {
+private fun KeySample(label: String, marked: Boolean) {
     Box(
         modifier = Modifier
             .height(30.dp)
@@ -536,6 +563,7 @@ private fun KeySample(label: String) {
             .widthIn(max = 96.dp)
             .clip(LimentyShapes.Small)
             .background(LimentyColors.Surface3)
+            .then(if (marked) Modifier.keyGroupMark() else Modifier)
             .padding(horizontal = 9.dp),
         contentAlignment = Alignment.Center,
     ) {

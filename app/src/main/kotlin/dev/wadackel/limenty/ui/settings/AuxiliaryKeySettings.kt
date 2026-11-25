@@ -126,10 +126,9 @@ fun AuxiliaryKeyDialog(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                LimentyTextButton(
-                    label = if (where.pinned) "Unpin" else "Pin right",
-                    onClick = where.onTogglePin,
-                )
+                where.onTogglePin?.let { toggle ->
+                    LimentyTextButton(label = if (where.pinned) "Unpin" else "Pin right", onClick = toggle)
+                }
                 LimentyTextButton(
                     label = "Remove",
                     onClick = where.onRemove,
@@ -367,7 +366,8 @@ private fun AddStepChip(onClick: () -> Unit) {
 /** What can be done with a key that already exists, for the dialog to offer alongside its fields. */
 data class KeyPlacement(
     val pinned: Boolean,
-    val onTogglePin: () -> Unit,
+    /** Null for a key in a group, which goes where its group goes. */
+    val onTogglePin: (() -> Unit)?,
     val onRemove: () -> Unit,
 )
 

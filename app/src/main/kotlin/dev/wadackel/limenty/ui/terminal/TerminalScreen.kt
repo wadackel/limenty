@@ -88,6 +88,7 @@ fun TerminalScreen(
     var selectionLink by remember { mutableStateOf<String?>(null) }
     var selectionBounds by remember { mutableStateOf<SelectionBounds?>(null) }
     var retypedPassword by remember { mutableStateOf("") }
+    val keyGroups = rememberKeyGroupPopupState()
 
     val pipeline = remember(session) {
         TerminalInputPipeline(
@@ -115,6 +116,12 @@ fun TerminalScreen(
             imeVisible -> terminalView?.hideSoftKeyboard()
             else -> onBack()
         }
+    }
+
+    // The overlay that replaces a session is drawn over the bar, and a popup left open under it would
+    // still be open, over other keys, when the session came back.
+    LaunchedEffect(state) {
+        if (state !is ConnectionState.Connected) keyGroups.close()
     }
 
     LaunchedEffect(revision, terminalView) {
@@ -296,6 +303,7 @@ fun TerminalScreen(
                             onKeySetSwitched(delta)
                         },
                     ),
+                    groups = keyGroups,
                 )
             }
         }
