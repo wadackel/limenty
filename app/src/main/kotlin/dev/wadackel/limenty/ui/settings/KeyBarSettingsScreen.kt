@@ -62,6 +62,7 @@ import dev.wadackel.limenty.data.KeyGroup
 import dev.wadackel.limenty.data.KeySet
 import dev.wadackel.limenty.data.SlotPosition
 import dev.wadackel.limenty.data.TerminalPreferences
+import dev.wadackel.limenty.ui.components.DropInto
 import dev.wadackel.limenty.ui.components.LimentyDialog
 import dev.wadackel.limenty.ui.components.LimentyDialogActions
 import dev.wadackel.limenty.ui.components.LimentyNameDialog
@@ -115,6 +116,19 @@ fun KeyBarSettingsScreen(
     val pinnedOrder = key(index) { rememberReorderState<KeyBarSlot>() }
     val scrollingOrder = key(index) { rememberReorderState<KeyBarSlot>() }
     val setOrder = rememberReorderState<KeySet>()
+    val intoGroup: (Boolean) -> DropInto<KeyBarSlot> = { pinnedRow ->
+        DropInto(
+            accepts = { dragged, onto -> dragged is AuxiliaryKey && onto is KeyGroup },
+            onDrop = { items, from, onto ->
+                onChange {
+                    it.updateKeySet(index) { s ->
+                        val reordered = if (pinnedRow) s.copy(pinned = items) else s.copy(scrolling = items)
+                        reordered.moveIntoGroup(SlotPosition(pinnedRow, from), SlotPosition(pinnedRow, onto))
+                    }
+                }
+            },
+        )
+    }
 
     BoxWithConstraints(
         modifier = Modifier
@@ -187,13 +201,14 @@ fun KeyBarSettingsScreen(
             Column(
                 modifier = Modifier
                     .padding(horizontal = margin)
-                    .reorderGroup(pinnedOrder, pinned, onPinnedChange),
+                    .reorderGroup(pinnedOrder, pinned, dropInto = intoGroup(true), onReorder = onPinnedChange),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 pinned.forEachIndexed { index, key ->
                     PinnedRow(
                         key = key,
                         dragged = pinnedOrder.dragging == index,
+                        dropTarget = pinnedOrder.dropTarget == index,
                         onEdit = { editing = SlotPosition(pinned = true, index) },
                         modifier = Modifier.reorderable(pinnedOrder, index, pinned.size, key.spoken()),
                     )
@@ -206,7 +221,11 @@ fun KeyBarSettingsScreen(
             Column(modifier = Modifier.padding(start = margin, end = margin, top = 26.dp, bottom = 10.dp)) {
                 Text("Scrolling", style = LimentyText.Section)
                 Text(
-                    "Tap a key to change it. Hold to move it.",
+                    if (groupsIn(set).isEmpty()) {
+                        "Tap a key to change it. Hold to move it."
+                    } else {
+                        "Tap a key to change it. Hold to move it, or drop it on a group."
+                    },
                     style = LimentyText.Secondary,
                     color = LimentyColors.Text3,
                 )
@@ -215,7 +234,7 @@ fun KeyBarSettingsScreen(
                 modifier = Modifier
                     .padding(horizontal = margin)
                     .padding(bottom = 40.dp)
-                    .reorderGroup(scrollingOrder, scrolling, onScrollingChange),
+                    .reorderGroup(scrollingOrder, scrolling, dropInto = intoGroup(false), onReorder = onScrollingChange),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
@@ -223,6 +242,7 @@ fun KeyBarSettingsScreen(
                     ScrollingChip(
                         key = key,
                         dragged = scrollingOrder.dragging == index,
+                        dropTarget = scrollingOrder.dropTarget == index,
                         onEdit = { editing = SlotPosition(pinned = false, index) },
                         modifier = Modifier.reorderable(scrollingOrder, index, scrolling.size, key.spoken()),
                     )
@@ -473,6 +493,7 @@ internal fun fitReading(run: Dp, room: Dp): String {
 private fun PinnedRow(
     key: KeyBarSlot,
     dragged: Boolean,
+    dropTarget: Boolean,
     onEdit: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -484,7 +505,7 @@ private fun PinnedRow(
             .then(modifier)
             .clip(LimentyShapes.Surface)
             .background(if (dragged) LimentyColors.Surface2 else LimentyColors.Surface)
-            .selectedRing(dragged)
+            .selectedRing(dragged || dropTarget)
             .padding(horizontal = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -530,6 +551,7 @@ private fun DragGrip() {
 private fun ScrollingChip(
     key: KeyBarSlot,
     dragged: Boolean,
+    dropTarget: Boolean,
     onEdit: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -542,7 +564,7 @@ private fun ScrollingChip(
             .clip(LimentyShapes.Surface)
             .background(LimentyColors.Surface3)
             .then(if (key is KeyGroup) Modifier.keyGroupMark() else Modifier)
-            .selectedRing(dragged)
+            .selectedRing(dragged || dropTarget)
             .padding(horizontal = 12.dp)
             .semantics(mergeDescendants = true) { contentDescription = key.spoken() },
         contentAlignment = Alignment.Center,
