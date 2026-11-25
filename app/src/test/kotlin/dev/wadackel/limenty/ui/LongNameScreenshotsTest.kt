@@ -10,6 +10,7 @@ import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -115,14 +116,22 @@ class LongNameScreenshotsTest {
     }
 
     @Test
-    fun `long key set names on the key set tabs on the cover display`() {
-        save(show { KeyBarSettingsScreen(preferences = keyBarPreferences, onChange = {}, onBack = {}) }, "key-set-tabs-folded")
+    fun `a long key set name on the key set chooser on the cover display`() {
+        save(show { KeyBarSettingsScreen(preferences = keyBarPreferences, onChange = {}, onBack = {}) }, "key-set-chooser-folded")
     }
 
     @Test
     @Config(qualifiers = UNFOLDED)
-    fun `long key set names on the key set tabs on the unfolded display`() {
-        save(show { KeyBarSettingsScreen(preferences = keyBarPreferences, onChange = {}, onBack = {}) }, "key-set-tabs-unfolded")
+    fun `a long key set name on the key set chooser on the unfolded display`() {
+        save(show { KeyBarSettingsScreen(preferences = keyBarPreferences, onChange = {}, onBack = {}) }, "key-set-chooser-unfolded")
+    }
+
+    @Test
+    fun `long key set names in the key set menu`() {
+        show { KeyBarSettingsScreen(preferences = keyBarPreferences, onChange = {}, onBack = {}) }
+        compose.onNodeWithText(LONG_SET_NAME).performClick()
+        compose.waitForIdle()
+        save(Screenshots.capture(compose, compose.onNode(isDialog())), "key-set-menu-folded")
     }
 
     @Test

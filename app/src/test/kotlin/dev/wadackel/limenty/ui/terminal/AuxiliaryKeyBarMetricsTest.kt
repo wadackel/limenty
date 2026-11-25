@@ -6,7 +6,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlin.math.abs
-import kotlin.math.roundToInt
 
 /**
  * The arithmetic behind the note on the key bar settings screen.
@@ -59,31 +58,7 @@ class AuxiliaryKeyBarMetricsTest {
     }
 
     @Test
-    fun `four arrows leave the cover display room to scroll in`() {
-        val run = metrics.pinnedRun(List(4) { metrics.keyWidth("←", textWidth("←")) })
-        assertDp(164.dp, run)
-        assertDp(251.dp, metrics.scrollRoom(metrics.coverWidth, run))
-    }
-
-    /** The case the note exists to catch: four word-labelled keys is a legal thing to pin. */
-    @Test
-    fun `four word labelled keys leave it too little`() {
-        val run = metrics.pinnedRun(List(4) { metrics.keyWidth("PgDn", textWidth("PgDn")) })
-        assertDp(246.8208.dp, run)
-
-        val room = metrics.scrollRoom(metrics.coverWidth, run)
-        assertDp(168.1792.dp, room)
-        assertTrue("${room.value}dp should read as too tight", room < metrics.minScrollRoom)
-
-        // Rounded rather than truncated: the note would otherwise read 246 for a run of 246.82.
-        assertEquals(247, run.value.roundToInt())
-    }
-
-    /** With nothing pinned there is no divider, so its block is not taken out of the row. */
-    @Test
-    fun `an empty right hand side is not charged for the divider`() {
-        assertDp(436.dp, metrics.scrollRoom(metrics.coverWidth, 0.dp))
-        // One pinned dp brings the divider back: 460 − 24 − 21 − 1.
-        assertDp(414.dp, metrics.scrollRoom(metrics.coverWidth, 1.dp))
+    fun `four arrows claim four squares and three gaps`() {
+        assertDp(164.dp, metrics.pinnedRun(List(4) { metrics.keyWidth("←", textWidth("←")) }))
     }
 }

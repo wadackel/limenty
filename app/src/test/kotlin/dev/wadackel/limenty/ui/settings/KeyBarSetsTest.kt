@@ -7,11 +7,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isEnabled
-import androidx.compose.ui.test.isSelected
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.performClick
@@ -79,43 +81,80 @@ class KeyBarSetsTest {
         press("Save")
     }
 
+    /** The set's name above the bar, told apart from the same name in its menu by what tapping it does. */
+    private val choosesSet = SemanticsMatcher("opens the key set menu") { it.config.getOrNull(SemanticsActions.OnClick)?.label == "Choose key set" }
+
+    /** From the set's name, which opens the menu of sets and of what can be done to this one. */
+    private fun fromMenu(choice: String) {
+        rule.onNode(choosesSet).performClick()
+        rule.waitForIdle()
+        press(choice)
+    }
+
+    private fun editingSet(name: String) = rule.onNode(choosesSet and hasText(name)).assertExists()
+
     @Test
     fun duplicatingASetAddsItUnderTheNameGivenAndOpensIt() {
         show(listOf(vim))
 
-        press("Duplicate")
+        fromMenu("Duplicate")
         rule.onNode(hasSetTextAction() and hasText("Vim copy")).assertExists()
         nameAs("Agent")
 
         assertEquals(listOf(vim, vim.copy(name = "Agent")), preferences.keySets)
-        rule.onNode(hasText("Agent") and isSelected()).assertExists()
+        editingSet("Agent")
+    }
+
+    @Test
+    fun aNewSetIsAddedUnderTheNameGivenAndOpened() {
+        show(listOf(vim))
+
+        fromMenu("New set")
+        nameAs("Logs")
+
+        assertEquals(listOf(vim, KeySet.starter("Logs")), preferences.keySets)
+        assertEquals(0, preferences.keySetIndex)
+        editingSet("Logs")
     }
 
     @Test
     fun renamingASetKeepsItsKeys() {
         show(listOf(vim, agent))
 
-        press("Rename")
+        fromMenu("Rename")
         nameAs("Editor")
 
         assertEquals(listOf(vim.copy(name = "Editor"), agent), preferences.keySets)
     }
 
     @Test
-    fun choosingATabToEditDoesNotChangeTheSetInUse() {
+    fun choosingASetToEditDoesNotChangeTheSetInUse() {
         show(listOf(vim, agent))
 
-        press("Agent")
+        fromMenu("Agent")
 
-        rule.onNode(hasText("Agent") and isSelected()).assertExists()
+        editingSet("Agent")
         assertEquals(0, preferences.keySetIndex)
+        rule.onAllNodes(hasText("Xxx") and hasClickAction()).onLast().assertExists()
+    }
+
+    /** "In use" says which set the terminal shows, which is not always the one being edited. */
+    @Test
+    fun theSetInUseIsMarkedOnlyWhileItIsTheOneBeingEdited() {
+        show(listOf(vim, agent), active = 1)
+
+        editingSet("Agent")
+        rule.onNode(hasText("In use")).assertExists()
+
+        fromMenu("Vim")
+        rule.onNode(hasText("In use")).assertDoesNotExist()
     }
 
     @Test
     fun editingTheChosenSetLeavesTheOthersAlone() {
         show(listOf(vim, agent))
 
-        press("Agent")
+        fromMenu("Agent")
         press("Xxx")
         press("Remove")
         press("Remove")
@@ -128,17 +167,22 @@ class KeyBarSetsTest {
     fun deletingTheSetInUseLeavesAValidSetInUseAndOnScreen() {
         show(listOf(vim, agent, tmux), active = 2)
 
-        press("Delete")
+        fromMenu("Delete")
         press("Delete")
 
         assertEquals(listOf(vim, agent), preferences.keySets)
         assertEquals(1, preferences.keySetIndex)
-        rule.onNode(hasText("Agent") and isSelected()).assertExists()
+        editingSet("Agent")
     }
 
     @Test
     fun withOneSetThereIsNoWayToDeleteIt() {
         show(listOf(vim))
+
+        fromMenu("Rename")
+        press("Cancel")
+        rule.onNode(choosesSet).performClick()
+        rule.waitForIdle()
 
         rule.onNode(hasText("Delete")).assertDoesNotExist()
     }

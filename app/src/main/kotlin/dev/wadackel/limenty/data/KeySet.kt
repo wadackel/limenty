@@ -47,10 +47,22 @@ data class KeySet(
         return withRow(group.pinned, updated)
     }
 
+    /** Moves the scrolling slot at [index] to the end of the pinned run, where it is drawn last. */
+    fun pin(index: Int): KeySet {
+        val moving = scrolling.getOrNull(index) ?: return this
+        return copy(scrolling = scrolling.filterIndexed { at, _ -> at != index }, pinned = pinned + moving)
+    }
+
     companion object {
         const val DEFAULT_NAME = "Default"
 
         val Default = KeySet(DEFAULT_NAME, AuxiliaryKey.DefaultScrolling, AuxiliaryKey.DefaultPinned)
+
+        /**
+         * A new set with Escape and the arrows, rather than nothing: an empty bar is a strip with
+         * nothing on it to tap, and these are the keys almost any set ends up wanting.
+         */
+        fun starter(name: String): KeySet = KeySet(name, AuxiliaryKey.DefaultScrolling.take(1), AuxiliaryKey.DefaultPinned)
 
         fun encode(sets: List<KeySet>): String {
             val array = JSONArray()
