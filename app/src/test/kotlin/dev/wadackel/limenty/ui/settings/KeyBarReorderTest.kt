@@ -8,11 +8,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.SemanticsNodeInteraction
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotDisplayed
+import androidx.compose.ui.test.assertIsNotSelected
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isEnabled
-import androidx.compose.ui.test.isSelected
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.dp
@@ -93,12 +99,13 @@ class KeyBarReorderTest {
     }
 
     /**
-     * The key by that name in the list, not the one in the preview above it.
-     *
-     * The screen shows the bar it is configuring, so every label is on screen twice. The preview
-     * copy is inert, which is what tells them apart.
+     * The key by that name in the list, not the one on the bar above it: the list comes later in
+     * the tree. A pinned key is only on the bar, so its one match is the last as well.
      */
-    private fun key(label: String): SemanticsNodeInteraction = rule.onNode(hasText(label) and hasClickAction() and isEnabled())
+    private fun key(label: String): SemanticsNodeInteraction = rule.onAllNodes(hasText(label) and hasClickAction() and isEnabled()).onLast()
+
+    /** The key by that name on the bar, which is drawn before the list. */
+    private fun onBar(label: String): SemanticsNodeInteraction = rule.onAllNodes(hasText(label) and hasClickAction() and isEnabled()).onFirst()
 
     /**
      * Holds, travels onto another key in steps, lets go.
@@ -187,49 +194,62 @@ class KeyBarReorderTest {
         assertEquals(labels.moved(labels.lastIndex, 2), lastScrolling?.map { it.label })
     }
 
+    /** The pinned keys are drawn only on the bar, so the bar's right end is where a key is pinned. */
     @Test
-    fun aSetDraggedPastTheOthersStaysInUseAndBeingEdited() {
-        showSets(listOf(vim, agent, tmux))
-        dragOnto("Vim", "tmux")
-        assertEquals(listOf("Agent", "tmux", "Vim"), preferences.keySets.map { it.name })
-        assertEquals(2, preferences.keySetIndex)
-        rule.onNode(hasText("Vim") and isSelected()).assertExists()
+    fun aScrollingKeyCarriedOntoTheRightEndOfTheBarIsPinnedLast() {
+        show()
+        dragOnto("Bbb", "Up")
+        assertEquals(listOf("Aaa", "Ccc", "Ddd"), preferences.keySet.scrolling.map { it.label })
+        assertEquals(listOf("Left", "Down", "Up", "Bbb"), preferences.keySet.pinned.map { it.label })
     }
 
-    /** Tabs are as wide as their names, and a long one passing a short one still lands where dropped. */
+    /** Short of the right end, the bar is not a place to drop: the key stays where it was. */
     @Test
-    fun aSetWithALongNameDraggedPastAShortOneLandsWhereDropped() {
-        val long = agent.copy(name = "Agent workspace")
-        showSets(listOf(long, vim, tmux))
-        dragOnto("Agent workspace", "tmux")
-        assertEquals(listOf("Vim", "tmux", "Agent workspace"), preferences.keySets.map { it.name })
+    fun aScrollingKeyLetGoOverTheScrollingPartOfTheBarIsNotPinned() {
+        show()
+        dragOnto("Ddd", "Aaa")
+        assertEquals(listOf("Left", "Down", "Up"), preferences.keySet.pinned.map { it.label })
     }
 
-    /** Moving a set the screen is not editing must not swap out the one it is. */
+    /** Selected low in a list long enough to run off the bar, the key is brought into view there. */
     @Test
-    fun draggingAnotherSetKeepsTheOneBeingEditedOnScreen() {
-        showSets(listOf(vim, agent, tmux))
-        key("tmux").performClick()
+    fun aKeySelectedInTheListIsMarkedOnTheBarAndScrolledIntoView() {
+        show(wrapping)
+        val last = wrapping.last().label
+        onBar(last).assertIsNotDisplayed()
+
+        key(last).performClick()
+        rule.waitForIdle()
+        rule.onNode(hasText("Cancel") and hasClickAction()).performClick()
         rule.waitForIdle()
 
-        dragOnto("Vim", "tmux")
-
-        assertEquals(listOf("Agent", "tmux", "Vim"), preferences.keySets.map { it.name })
-        rule.onNode(hasText("tmux") and isSelected()).assertExists()
-        key("Zzz").assertExists()
+        onBar(last).assertIsSelected().assertIsDisplayed()
+        key(last).assertIsSelected()
     }
 
+    /** A key just added is selected before the bar has placed it, and is still brought into view. */
     @Test
-    fun aShortPressOnASetChoosesItWithoutMovingIt() {
-        showSets(listOf(vim, agent, tmux))
-        key("Agent").performTouchInput {
-            down(center)
-            moveBy(Offset(40f, 0f), delayMillis = 20)
-            up()
-        }
+    fun aKeyAddedAtTheEndOfALongRunIsScrolledIntoViewOnTheBar() {
+        show(wrapping)
+        rule.onNode(hasContentDescription("Add key")).performClick()
         rule.waitForIdle()
-        assertEquals(listOf(vim, agent, tmux), preferences.keySets)
-        rule.onNode(hasText("Agent") and isSelected()).assertExists()
+        rule.onAllNodes(hasText("Save") and hasClickAction() and isEnabled()).onLast().performClick()
+        rule.waitForIdle()
+
+        onBar("Esc").assertIsSelected().assertIsDisplayed()
+    }
+
+    /** And the other way: a key tapped on the bar is the one marked in the list. */
+    @Test
+    fun aKeyTappedOnTheBarIsMarkedInTheList() {
+        show()
+        onBar("Ccc").performClick()
+        rule.waitForIdle()
+        rule.onNode(hasText("Cancel") and hasClickAction()).performClick()
+        rule.waitForIdle()
+
+        key("Ccc").assertIsSelected()
+        key("Bbb").assertIsNotSelected()
     }
 
     /** A tap is still a tap: it opens the editor rather than picking the key up. */

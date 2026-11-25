@@ -73,9 +73,9 @@ class KeyGroupSettingsTest {
     fun aNewGroupFilledWithKeysGoesAtTheEndOfTheScrollingRun() {
         show(KeySet("Default", scrolling = listOf(esc), pinned = emptyList()))
 
-        press("Add group")
+        press("+ Group")
         rule.onNode(hasSetTextAction()).performTextInput("nav")
-        rule.onNode(hasContentDescription("Add key")).performClick()
+        rule.onAllNodes(hasContentDescription("Add key")).onLast().performClick()
         rule.waitForIdle()
         press("Save")
         press("Save")
@@ -179,8 +179,8 @@ class KeyGroupSettingsTest {
     fun aKeyInAGroupBeingAddedCannotBeMovedOut() {
         show(KeySet("Default", scrolling = listOf(esc), pinned = emptyList()))
 
-        press("Add group")
-        rule.onNode(hasContentDescription("Add key")).performClick()
+        press("+ Group")
+        rule.onAllNodes(hasContentDescription("Add key")).onLast().performClick()
         rule.waitForIdle()
         press("Save")
         press("Esc")
@@ -193,7 +193,7 @@ class KeyGroupSettingsTest {
     fun aGroupWithNoNameAndNoKeysCannotBeSaved() {
         show(KeySet("Default", scrolling = listOf(esc), pinned = emptyList()))
 
-        press("Add group")
+        press("+ Group")
 
         rule.onNode(hasText("Save") and hasClickAction() and isEnabled()).assertDoesNotExist()
     }

@@ -13,8 +13,11 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.awaitVerticalTouchSlopOrCancellation
@@ -56,6 +59,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -79,6 +83,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
@@ -94,6 +99,11 @@ import dev.wadackel.limenty.core.terminal.TerminalFont
 import dev.wadackel.limenty.data.AuxiliaryKey
 import dev.wadackel.limenty.data.KeyBarSlot
 import dev.wadackel.limenty.data.KeyGroup
+import dev.wadackel.limenty.data.SlotPosition
+import dev.wadackel.limenty.ui.components.DropInto
+import dev.wadackel.limenty.ui.components.ReorderState
+import dev.wadackel.limenty.ui.components.reorderGroup
+import dev.wadackel.limenty.ui.components.reorderable
 import dev.wadackel.limenty.ui.theme.LimentyColors
 import dev.wadackel.limenty.ui.theme.LimentyShapes
 import dev.wadackel.limenty.ui.theme.LimentyText
@@ -132,6 +142,8 @@ fun AuxiliaryKeyBar(
     interactive: Boolean = true,
     switcher: KeySetSwitcher? = null,
     groups: KeyGroupPopupState = rememberKeyGroupPopupState(),
+    /** Set where the bar is edited rather than used; [interactive] is then ignored for taps. */
+    editing: KeyBarEditing? = null,
 ) {
     // Switching sets puts other slots under the popup's keys, and a popup left open over them
     // would send from a group the bar no longer shows.
@@ -140,7 +152,9 @@ fun AuxiliaryKeyBar(
         BackHandler(enabled = groups.isOpen) { groups.close() }
     }
     var placement by remember { mutableStateOf(BarPlacement()) }
-    val switching = switcher?.takeIf { interactive && it.count > 1 }
+    // Edited bars swipe too: the settings switch the set being edited the way the terminal switches
+    // the one in use, so there is one gesture to learn for both.
+    val switching = switcher?.takeIf { (interactive || editing != null) && it.count > 1 }
     // Which way the last switch went, so a wrap from the last set to the first still slides the
     // way the thumb moved rather than the way the index did.
     var direction by remember { mutableIntStateOf(1) }
@@ -152,7 +166,9 @@ fun AuxiliaryKeyBar(
     val onSwitch by rememberUpdatedState(switch)
     // On every key rather than on the bar: a screen reader only lands on the keys, so actions on the
     // bar around them are there in the tree and out of reach.
-    val setActions = if (switching == null) {
+    // Not while editing: a pinned key there carries its own move actions, and two lists of custom
+    // actions on one node replace each other rather than adding up.
+    val setActions = if (switching == null || editing != null) {
         emptyList()
     } else {
         listOf(
@@ -196,7 +212,10 @@ fun AuxiliaryKeyBar(
             },
             label = "keySet",
         ) { page ->
-            BarRow(page.keys, page.pinned, BarInput(interactive, onKeyPressed, setActions, groups))
+            // Only the page arriving is edited. The one sliding out is drawn from the set it showed,
+            // and handing it the new set's drag state would let its keys overwrite the ones measured.
+            val edited = editing?.takeIf { page.index == (switcher?.index ?: 0) }
+            BarRow(page.keys, page.pinned, BarInput(interactive && editing == null, onKeyPressed, setActions, groups, edited))
         }
         if (switching != null) {
             SetMarks(switching.index, switching.count, Modifier.align(Alignment.TopCenter))
@@ -268,6 +287,28 @@ private class BarInput(
     val onKeyPressed: (AuxiliaryKey) -> Unit,
     val setActions: List<CustomAccessibilityAction>,
     val groups: KeyGroupPopupState,
+    val editing: KeyBarEditing?,
+)
+
+/**
+ * The bar as the settings show it: the real thing at its real size, where a tap picks a key to edit
+ * rather than sending it.
+ *
+ * Pinned keys are moved here, by holding one, because this is the only place they are drawn: a list
+ * of them below the bar showed every pinned key twice. Scrolling keys are moved in the list instead,
+ * which has the room to show them all at once.
+ */
+class KeyBarEditing(
+    /** Marked, and scrolled into view when it is a scrolling key. */
+    val selected: SlotPosition?,
+    val onSelect: (SlotPosition) -> Unit,
+    val pinnedOrder: ReorderState<KeyBarSlot>,
+    val onPinnedReorder: (List<KeyBarSlot>) -> Unit,
+    val pinnedDropInto: DropInto<KeyBarSlot>?,
+    /** True while a key carried from elsewhere would be pinned if let go: the place it goes is shown. */
+    val pinning: Boolean,
+    /** Where a carried key is pinned, in the root's coordinates, reported whenever the bar is placed. */
+    val onPinZone: (Rect) -> Unit,
 )
 
 /**
@@ -387,11 +428,26 @@ private fun BarRow(
     input: BarInput,
 ) {
     val scrollState = rememberScrollState()
+    val editing = input.editing
+    val placed = remember { BarGeometry() }
+    val reach = with(LocalDensity.current) { PIN_ZONE_MIN_WIDTH.toPx() }
+    if (editing != null) ScrollToSelected(editing.selected, scrollState, placed)
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(
+                if (editing == null) {
+                    Modifier
+                } else {
+                    Modifier.onGloballyPositioned { row ->
+                        placed.row = row
+                        placed.pinZone(row, reach)?.let(editing.onPinZone)
+                    }
+                },
+            ),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(modifier = Modifier.weight(1f)) {
+        Box(modifier = Modifier.weight(1f).onGloballyPositioned { placed.viewport = it }) {
             Row(
                 modifier = Modifier
                     .horizontalScroll(scrollState)
@@ -399,7 +455,14 @@ private fun BarRow(
                     .padding(start = EDGE_PADDING - KEY_GAP / 2, end = FADE_WIDTH - KEY_GAP / 2),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                keys.forEach { slot -> BarSlot(slot, pinned = false, input) }
+                keys.forEachIndexed { index, slot ->
+                    BarSlot(
+                        slot,
+                        SlotPosition(pinned = false, index),
+                        input,
+                        if (editing == null) Modifier else Modifier.onGloballyPositioned { placed.scrolling[index] = it },
+                    )
+                }
             }
             // Only while there is more to reach: on the unfolded display the whole run often fits,
             // and a fade over nothing says the opposite of what it is for.
@@ -424,35 +487,158 @@ private fun BarRow(
             }
         }
 
-        if (pinnedKeys.isNotEmpty()) {
+        val pinning = editing?.pinning == true
+        if (pinnedKeys.isNotEmpty() || pinning) {
             Box(
                 modifier = Modifier
+                    .onGloballyPositioned { placed.divider = it }
                     .padding(start = DIVIDER_MARGIN, end = DIVIDER_MARGIN - KEY_GAP / 2)
                     .width(1.dp)
                     .height(DIVIDER_HEIGHT)
                     .background(LimentyColors.Line),
             )
             Row(
-                modifier = Modifier.padding(end = EDGE_PADDING - KEY_GAP / 2),
+                modifier = Modifier
+                    .padding(end = EDGE_PADDING - KEY_GAP / 2)
+                    .then(
+                        if (editing == null) {
+                            Modifier
+                        } else {
+                            Modifier.reorderGroup(editing.pinnedOrder, pinnedKeys, editing.pinnedDropInto, onReorder = editing.onPinnedReorder)
+                        },
+                    ),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                pinnedKeys.forEach { slot -> BarSlot(slot, pinned = true, input) }
+                pinnedKeys.forEachIndexed { index, slot ->
+                    BarSlot(
+                        slot,
+                        SlotPosition(pinned = true, index),
+                        input,
+                        if (editing == null) {
+                            Modifier
+                        } else {
+                            Modifier.reorderable(editing.pinnedOrder, index, pinnedKeys.size, slot.spoken())
+                        },
+                    )
+                }
+                if (pinning) PinPlaceholder()
             }
+        } else if (editing != null) {
+            placed.divider = null
         }
     }
 }
 
+/**
+ * Where the parts of an edited bar were placed, for the scroll to the selection and for the zone a
+ * carried key is pinned in. Kept off the snapshot: nothing is drawn from it.
+ */
+private class BarGeometry {
+    var row: LayoutCoordinates? = null
+    var viewport: LayoutCoordinates? = null
+    var divider: LayoutCoordinates? = null
+    val scrolling = mutableMapOf<Int, LayoutCoordinates>()
+
+    /**
+     * From the divider to the bar's right edge, or the last stretch of the bar when nothing is
+     * pinned and there is no divider to start from — wide enough to hit with a key held under a
+     * thumb, which covers the key it is aiming past.
+     */
+    fun pinZone(row: LayoutCoordinates, reach: Float): Rect? {
+        if (!row.isAttached) return null
+        val bounds = row.boundsInRoot()
+        val start = divider?.takeIf { it.isAttached }?.boundsInRoot()?.left ?: bounds.right
+        return Rect(minOf(start, bounds.right - reach), bounds.top, bounds.right, bounds.bottom)
+    }
+}
+
+/**
+ * Brings the selected scrolling key fully into view, clear of the fade at the run's end. The page
+ * around the bar is left where it is: the key was chosen in the list below, which is where the
+ * thumb still is.
+ */
 @Composable
-private fun BarSlot(slot: KeyBarSlot, pinned: Boolean, input: BarInput) {
+private fun ScrollToSelected(selected: SlotPosition?, scrollState: ScrollState, placed: BarGeometry) {
+    val density = LocalDensity.current
+    LaunchedEffect(selected) {
+        if (selected == null || selected.pinned) return@LaunchedEffect
+        val slot = placed.scrolling[selected.index]?.takeIf { it.isAttached } ?: return@LaunchedEffect
+        val viewport = placed.viewport?.takeIf { it.isAttached } ?: return@LaunchedEffect
+        val left = viewport.localPositionOf(slot, Offset.Zero).x
+        val right = left + slot.size.width
+        val start = with(density) { (EDGE_PADDING - KEY_GAP / 2).toPx() }
+        val end = viewport.size.width - with(density) { FADE_WIDTH.toPx() }
+        val by = when {
+            left < start -> left - start
+            right > end -> right - end
+            else -> 0f
+        }
+        if (by != 0f) scrollState.animateScrollBy(by)
+    }
+}
+
+/** Where a carried key will land at the end of the pinned run, outlined until it is let go there. */
+@Composable
+private fun PinPlaceholder() {
+    Box(
+        modifier = Modifier.height(ROW_HEIGHT).padding(horizontal = KEY_GAP / 2),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(KEY_HEIGHT)
+                .border(1.5.dp, LimentyColors.Accent, RoundedCornerShape(KEY_RADIUS)),
+        )
+    }
+}
+
+/** [handle] goes inside the slot's tap, where a drag that begins on a hold can take the press over. */
+@Composable
+private fun BarSlot(slot: KeyBarSlot, at: SlotPosition, input: BarInput, handle: Modifier = Modifier) {
+    val editing = input.editing
+    if (editing != null) {
+        EditedSlot(slot, at, editing, handle)
+        return
+    }
     when (slot) {
-        is AuxiliaryKey -> BarKey(slot, pinned, input)
-        is KeyGroup -> GroupSlot(slot, pinned, input)
+        is AuxiliaryKey -> BarKey(slot, at.pinned, input, handle)
+        is KeyGroup -> GroupSlot(slot, at.pinned, input, handle)
+    }
+}
+
+/**
+ * A slot on an edited bar: a tap selects it and a group stays shut, since what is being asked
+ * for is the slot to edit, not the key it sends.
+ */
+@Composable
+private fun EditedSlot(slot: KeyBarSlot, at: SlotPosition, editing: KeyBarEditing, handle: Modifier) {
+    val order = editing.pinnedOrder.takeIf { at.pinned }
+    val lifted = order != null && (order.dragging == at.index || order.dropTarget == at.index)
+    Box(
+        modifier = Modifier
+            .height(ROW_HEIGHT)
+            .clickable(role = Role.Button) { editing.onSelect(at) }
+            .then(handle)
+            .semantics(mergeDescendants = true) {
+                contentDescription = slot.spoken()
+                selected = editing.selected == at
+            }
+            .padding(horizontal = KEY_GAP / 2),
+        contentAlignment = Alignment.Center,
+    ) {
+        KeyFace(
+            slot.label,
+            face = slotFace(at.pinned),
+            ink = slotInk(at.pinned),
+            marked = slot is KeyGroup,
+            ringed = lifted || editing.selected == at,
+        )
     }
 }
 
 /** One key on the bar. A pinned key and a scrolling one differ only in colour. */
 @Composable
-private fun BarKey(key: AuxiliaryKey, pinned: Boolean, input: BarInput) {
+private fun BarKey(key: AuxiliaryKey, pinned: Boolean, input: BarInput, handle: Modifier) {
     val haptics = LocalHapticFeedback.current
     Box(
         modifier = Modifier
@@ -461,6 +647,7 @@ private fun BarKey(key: AuxiliaryKey, pinned: Boolean, input: BarInput) {
                 haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                 input.onKeyPressed(key)
             }
+            .then(handle)
             // The face is `←`, which a screen reader would otherwise read out as the character's name.
             .semantics(mergeDescendants = true) {
                 contentDescription = key.spoken()
@@ -485,7 +672,7 @@ private fun BarKey(key: AuxiliaryKey, pinned: Boolean, input: BarInput) {
  * swipe and drag that started on a group. A drag before the hold still belongs to them.
  */
 @Composable
-private fun GroupSlot(group: KeyGroup, pinned: Boolean, input: BarInput) {
+private fun GroupSlot(group: KeyGroup, pinned: Boolean, input: BarInput, handle: Modifier) {
     val haptics = LocalHapticFeedback.current
     val popup = input.groups
     val owner = remember { Any() }
@@ -505,6 +692,7 @@ private fun GroupSlot(group: KeyGroup, pinned: Boolean, input: BarInput) {
         modifier = Modifier
             .height(ROW_HEIGHT)
             .onGloballyPositioned { placed.coordinates = it }
+            .then(handle)
             .then(
                 if (!input.interactive) {
                     Modifier
@@ -699,7 +887,7 @@ private fun KeyGroupLayer(popup: KeyGroupPopupState, placement: BarPlacement, on
  * inside the face, so a group is exactly as wide as a key with the same label.
  */
 @Composable
-private fun KeyFace(label: String, face: Color, ink: Color, marked: Boolean = false) {
+private fun KeyFace(label: String, face: Color, ink: Color, marked: Boolean = false, ringed: Boolean = false) {
     // A one-character label gets a square rather than a letterbox: `|` and `~` in a key shaped for
     // `PgDn` read as mostly empty, and the four of them together made the run look gappy.
     val square = label.length == 1
@@ -715,6 +903,7 @@ private fun KeyFace(label: String, face: Color, ink: Color, marked: Boolean = fa
             .clip(RoundedCornerShape(KEY_RADIUS))
             .background(face)
             .then(if (marked) Modifier.keyGroupMark() else Modifier)
+            .then(if (ringed) Modifier.border(2.dp, LimentyColors.Accent, RoundedCornerShape(KEY_RADIUS)) else Modifier)
             // After the face is painted, so the label sits inside the key rather than the key
             // shrinking away from it.
             .then(if (square) Modifier else Modifier.padding(horizontal = LABEL_PADDING)),
@@ -749,10 +938,8 @@ internal fun Modifier.keyGroupMark(): Modifier = drawWithContent {
 /**
  * The bar's measurements and the rules built on them, in one place.
  *
- * The settings screen works out how much of a folded display the pinned keys claim, which is
- * arithmetic over these numbers — kept here so changing a key's width cannot leave that answer
- * quietly wrong. [labelStyle] and [keyWidth] are here for the same reason: a second copy of either
- * would be a second answer to how wide a key is.
+ * [labelStyle] and [keyWidth] are here rather than beside whatever measures a key, because a second
+ * copy of either would be a second answer to how wide a key is.
  */
 internal object AuxiliaryKeyBarMetrics {
     val edgePadding = 12.dp
@@ -788,15 +975,6 @@ internal object AuxiliaryKeyBarMetrics {
 
     /** Everything between the scrolling run and the screen edge: the rule and its margins. */
     val dividerBlock = dividerMargin * 2 + 1.dp
-
-    /**
-     * The display the pinned keys are budgeted against, and the least that is worth scrolling in.
-     *
-     * The folded panel rather than the unfolded one, because over-pinning is invisible while
-     * configuring on the larger screen — which is the only reason the settings note exists.
-     */
-    val coverWidth = 460.dp
-    val minScrollRoom = 200.dp
 
     /**
      * How far a swipe has to travel to switch sets. Half a key's height again, so a thumb that
@@ -877,14 +1055,6 @@ internal object AuxiliaryKeyBarMetrics {
 
     /** What the pinned keys and the gaps between them claim. */
     fun pinnedRun(widths: List<Dp>): Dp = if (widths.isEmpty()) 0.dp else widths.reduce(Dp::plus) + keyGap * (widths.size - 1)
-
-    /**
-     * What is left over for the run that scrolls.
-     *
-     * The divider is only drawn when something is pinned, so with nothing pinned its block is not
-     * taken out — otherwise an empty right-hand side would read as 21dp narrower than it is.
-     */
-    fun scrollRoom(coverWidth: Dp, pinnedRun: Dp): Dp = coverWidth - edgePadding * 2 - (if (pinnedRun > 0.dp) dividerBlock else 0.dp) - pinnedRun
 }
 
 private val ROW_HEIGHT = AuxiliaryKeyBarMetrics.rowHeight
@@ -912,4 +1082,7 @@ private val POPUP_RISE = AuxiliaryKeyBarMetrics.popupRise
 private val POPUP_RISE_MILLIS = AuxiliaryKeyBarMetrics.popupRiseMillis
 private val POPUP_ELEVATION = 12.dp
 private const val SLIDE_MILLIS = 180
+
+/** The least of the bar's right end that takes a carried key to pin, when little or nothing is pinned yet. */
+private val PIN_ZONE_MIN_WIDTH = 88.dp
 private const val NAME_MILLIS = 650L

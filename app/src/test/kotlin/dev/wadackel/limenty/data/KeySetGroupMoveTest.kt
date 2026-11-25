@@ -72,4 +72,21 @@ class KeySetGroupMoveTest {
 
         assertEquals(listOf(KeyGroup("symbols", listOf(pipe)), dash, left), moved.pinned)
     }
+
+    @Test
+    fun `a pinned key goes to the end of the pinned run`() {
+        val set = KeySet("Default", scrolling = listOf(esc, sym, tab), pinned = listOf(left))
+
+        val pinned = set.pin(1)
+
+        assertEquals(listOf(esc, tab), pinned.scrolling)
+        assertEquals(listOf(left, sym), pinned.pinned)
+    }
+
+    @Test
+    fun `pinning a position past the end leaves the set as it was`() {
+        val set = KeySet("Default", scrolling = listOf(esc), pinned = emptyList())
+
+        assertEquals(set, set.pin(3))
+    }
 }

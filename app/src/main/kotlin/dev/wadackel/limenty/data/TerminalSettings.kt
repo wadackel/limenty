@@ -83,18 +83,9 @@ data class TerminalPreferences(
 
     fun updateKeySet(index: Int, transform: (KeySet) -> KeySet): TerminalPreferences = copy(keySets = keySets.mapIndexed { at, set -> if (at == index) transform(set) else set })
 
-    /**
-     * Takes [order] as the new order of the same sets, keeping the bar on the set it was showing.
-     *
-     * Found by identity rather than equality: a duplicated set renamed back is equal to its
-     * original, and the first equal one would then take over from the one actually in use.
-     */
-    fun reorderKeySets(order: List<KeySet>): TerminalPreferences {
-        val active = order.indexOfFirst { it === keySet }
-        return copy(keySets = order, activeKeySet = if (active >= 0) active else activeKeySet)
-    }
-
     fun duplicateKeySet(index: Int, name: String): TerminalPreferences = copy(keySets = keySets + keySets[index].copy(name = name))
+
+    fun addKeySet(set: KeySet): TerminalPreferences = copy(keySets = keySets + set)
 
     /**
      * Keeps the bar on the set it was showing. When that is the one removed, the set that slides

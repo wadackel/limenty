@@ -41,6 +41,16 @@ class DropInto<T>(
 )
 
 /**
+ * A place outside the group that an item can be carried to: a key onto the pinned end of the bar
+ * drawn above the list. [zone] is asked in the root's coordinates on every move rather than given
+ * once, because the page around both can scroll while the item is held.
+ */
+class DropOut<T>(
+    val zone: () -> Rect?,
+    val onDrop: (items: List<T>, from: Int) -> Unit,
+)
+
+/**
  * Shared state for one reorderable group.
  *
  * Holds where each slot ended up so a drag can ask what it is over. The alternative — deciding by
@@ -63,6 +73,7 @@ class ReorderState<T> internal constructor(private val haptics: HapticFeedback) 
     internal var items: List<T> = emptyList()
     internal var onReorder: (List<T>) -> Unit = {}
     internal var dropInto: DropInto<T>? = null
+    internal var dropOut: DropOut<T>? = null
 
     internal fun apply(from: Int, to: Int) {
         items = items.moved(from, to)
@@ -75,6 +86,10 @@ class ReorderState<T> internal constructor(private val haptics: HapticFeedback) 
 
     /** The item the dragged one would go into if let go now, by its position in the list, or null. */
     var dropTarget by mutableStateOf<Int?>(null)
+        private set
+
+    /** Whether the item is over [DropOut]'s zone, where letting go takes it out of the group. */
+    var overOut by mutableStateOf(false)
         private set
 
     /** The drop target whose zone the item last came out of, the one it may now be moved past. */
@@ -106,6 +121,7 @@ class ReorderState<T> internal constructor(private val haptics: HapticFeedback) 
     internal fun stop() {
         dragging = null
         dropTarget = null
+        overOut = false
         offset = Offset.Zero
     }
 
@@ -113,8 +129,19 @@ class ReorderState<T> internal constructor(private val haptics: HapticFeedback) 
     internal fun end() {
         val from = dragging
         val onto = dropTarget
+        val out = overOut
         stop()
-        if (from != null && onto != null) dropInto?.onDrop(items, from, onto)
+        when {
+            from == null -> Unit
+            out -> dropOut?.onDrop(items, from)
+            onto != null -> dropInto?.onDrop(items, from, onto)
+        }
+    }
+
+    private fun isOverOut(moving: Offset): Boolean {
+        val zone = dropOut?.zone?.invoke() ?: return false
+        val group = container?.takeIf { it.isAttached } ?: return false
+        return zone.contains(group.localToRoot(moving))
     }
 
     private fun takesDrop(from: Int, onto: Int): Boolean = onto != from && dropInto?.accepts(items[from], items[onto]) == true
@@ -134,6 +161,18 @@ class ReorderState<T> internal constructor(private val haptics: HapticFeedback) 
         offset += delta
         val from = dragging ?: return null
         val moving = picked.translate(offset).center
+
+        // Ahead of the drop targets and the walk: over the zone, the item is leaving the group, and
+        // the keys it passed on the way there should stay where they are.
+        val outside = isOverOut(moving)
+        if (outside != overOut) {
+            overOut = outside
+            if (outside) haptics.performHapticFeedback(HapticFeedbackType.GestureThresholdActivate)
+        }
+        if (outside) {
+            dropTarget = null
+            return null
+        }
 
         val over = items.indices.firstOrNull { at -> takesDrop(from, at) && slots[at]?.let { inDropZone(moving, it) } == true }
         if (over != dropTarget) {
@@ -237,6 +276,7 @@ fun <T> Modifier.reorderGroup(
     state: ReorderState<T>,
     items: List<T>,
     dropInto: DropInto<T>? = null,
+    dropOut: DropOut<T>? = null,
     onReorder: (List<T>) -> Unit,
 ): Modifier {
     // Not while a drag is in flight: what arrives then is the order the drag has already moved on
@@ -244,6 +284,7 @@ fun <T> Modifier.reorderGroup(
     if (state.dragging == null) state.items = items
     state.onReorder = onReorder
     state.dropInto = dropInto
+    state.dropOut = dropOut
     return onGloballyPositioned { state.container = it }
 }
 
@@ -302,7 +343,7 @@ fun Modifier.reorderable(
                 val lift = state.lift(index)
                 translationX = lift.x
                 translationY = lift.y
-                val scale = if (state.dropTarget != null) DROPPING_SCALE else LIFTED_SCALE
+                val scale = if (state.dropTarget != null || state.overOut) DROPPING_SCALE else LIFTED_SCALE
                 scaleX = scale
                 scaleY = scale
             }

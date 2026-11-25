@@ -75,30 +75,20 @@ class KeySetTest {
     }
 
     @Test
-    fun `moving the active set keeps it active in its new place`() {
-        val moved = preferences(active = 0).reorderKeySets(listOf(agent, tmux, vim))
+    fun `a new set goes at the end and leaves the set in use alone`() {
+        val added = preferences(active = 1).addKeySet(KeySet.starter("Logs"))
 
-        assertEquals(listOf(agent, tmux, vim), moved.keySets)
-        assertEquals(2, moved.keySetIndex)
+        assertEquals(listOf(vim, agent, tmux, KeySet.starter("Logs")), added.keySets)
+        assertEquals(agent, added.keySet)
     }
 
     @Test
-    fun `moving another set across the active one keeps the same set active`() {
-        val moved = preferences(active = 1).reorderKeySets(listOf(tmux, vim, agent))
+    fun `a new set starts with Escape scrolling and the arrows pinned`() {
+        val starter = KeySet.starter("Logs")
 
-        assertEquals(agent, moved.keySet)
-        assertEquals(2, moved.keySetIndex)
-    }
-
-    @Test
-    fun `two sets with the same keys and name are not mistaken for each other when moved`() {
-        val first = vim.copy()
-        val second = vim.copy()
-        val before = TerminalPreferences(keySets = listOf(first, agent, second), activeKeySet = 0)
-
-        val moved = before.reorderKeySets(listOf(second, agent, first))
-
-        assertEquals(2, moved.keySetIndex)
+        assertEquals("Logs", starter.name)
+        assertEquals(listOf(AuxiliaryKey("Esc", key = TerminalKey.Escape)), starter.scrolling)
+        assertEquals(AuxiliaryKey.DefaultPinned, starter.pinned)
     }
 
     @Test

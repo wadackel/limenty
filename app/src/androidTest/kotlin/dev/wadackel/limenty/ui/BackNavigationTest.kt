@@ -129,7 +129,7 @@ class BackNavigationTest {
         rule.onNodeWithText("Keyboard & key bar").performClick()
         awaitText("Key sets")
         rule.onNodeWithText("Key sets").performScrollTo().performClick()
-        awaitText("Pinned right")
+        awaitText("Keys")
 
         Espresso.pressBack()
 

@@ -14,6 +14,7 @@ import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.dp
 import dev.wadackel.limenty.core.input.TerminalKey
@@ -68,7 +69,7 @@ class KeyBarDropIntoGroupTest {
     }
 
     /** The list's copy of a slot, not the inert one in the preview bar above it. */
-    private fun slot(spoken: String): SemanticsNodeInteraction = rule.onNode((hasContentDescription(spoken) or hasText(spoken)) and hasClickAction() and isEnabled())
+    private fun slot(spoken: String): SemanticsNodeInteraction = rule.onAllNodes((hasContentDescription(spoken) or hasText(spoken)) and hasClickAction() and isEnabled()).onLast()
 
     private fun bounds(spoken: String): Rect = slot(spoken).fetchSemanticsNode().boundsInRoot
 
