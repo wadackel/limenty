@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -59,6 +58,11 @@ fun KeyGroupDialog(
     onSave: (KeyGroup) -> Unit,
     /** Null while adding, when there is nothing yet to pin or delete. */
     placement: KeyPlacement? = null,
+    /**
+     * Takes a key out of the group, given the group as edited so far and the key's place in it.
+     * Null while adding, when the group is not on the bar yet and has nowhere to put a key after it.
+     */
+    onMoveOut: ((edited: KeyGroup, member: Int) -> Unit)? = null,
 ) {
     var name by remember { mutableStateOf(initial.name) }
     var keys by remember { mutableStateOf(initial.keys) }
@@ -100,17 +104,7 @@ fun KeyGroupDialog(
             )
         }
 
-        placement?.let { where ->
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                where.onTogglePin?.let { toggle ->
-                    LimentyTextButton(label = if (where.pinned) "Unpin" else "Pin right", onClick = toggle)
-                }
-                LimentyTextButton(label = "Remove", onClick = where.onRemove, color = LimentyColors.Danger)
-            }
-        }
+        placement?.let { where -> PlacementActions(where) }
 
         LimentyDialogActions {
             LimentyTextButton("Cancel", onDismiss, color = LimentyColors.Text2)
@@ -139,6 +133,7 @@ fun KeyGroupDialog(
                     keys = keys.filterIndexed { index, _ -> index != at }
                     editing = null
                 },
+                onMoveOutOfGroup = onMoveOut?.let { move -> { move(KeyGroup(name, keys), at) } },
             ),
         )
     }

@@ -121,21 +121,7 @@ fun AuxiliaryKeyDialog(
         // Where the key lives and whether it lives at all, next to what it does. These used to
         // be buttons crowded into the key's own face on the list behind this dialog, which left
         // that face too small to read and nothing but a face to drag.
-        placement?.let { where ->
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                where.onTogglePin?.let { toggle ->
-                    LimentyTextButton(label = if (where.pinned) "Unpin" else "Pin right", onClick = toggle)
-                }
-                LimentyTextButton(
-                    label = "Remove",
-                    onClick = where.onRemove,
-                    color = LimentyColors.Danger,
-                )
-            }
-        }
+        placement?.let { where -> PlacementActions(where) }
 
         LimentyDialogActions {
             LimentyTextButton("Cancel", onDismiss, color = LimentyColors.Text2)
@@ -369,7 +355,56 @@ data class KeyPlacement(
     /** Null for a key in a group, which goes where its group goes. */
     val onTogglePin: (() -> Unit)?,
     val onRemove: () -> Unit,
+    /** The groups in the same set the key can move into. Empty offers nothing to move into. */
+    val groups: List<GroupTarget> = emptyList(),
+    /** Set for a key in a group: takes it out and places it right after the group. */
+    val onMoveOutOfGroup: (() -> Unit)? = null,
 )
+
+/** A group a key can be moved into, named by what its slot shows. */
+data class GroupTarget(val label: String, val onMove: () -> Unit)
+
+/**
+ * Where a key goes and whether it stays, under the fields of whatever dialog edits it.
+ *
+ * Wraps rather than staying on one line: a key on the bar in a set with groups offers three of
+ * these, which is wider than a dialog on the cover display.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+internal fun PlacementActions(where: KeyPlacement) {
+    var choosing by remember { mutableStateOf(false) }
+    FlowRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        where.onTogglePin?.let { toggle ->
+            LimentyTextButton(label = if (where.pinned) "Unpin" else "Pin right", onClick = toggle)
+        }
+        if (where.groups.isNotEmpty()) {
+            // Chosen from a list even when there is one group, so the button never moves a key
+            // somewhere its label does not name.
+            Box {
+                LimentyTextButton(label = "Move to group", onClick = { choosing = true })
+                DropdownMenu(expanded = choosing, onDismissRequest = { choosing = false }) {
+                    where.groups.forEach { target ->
+                        DropdownMenuItem(
+                            text = { Text(target.label, fontFamily = FontFamily.Monospace) },
+                            onClick = {
+                                choosing = false
+                                target.onMove()
+                            },
+                        )
+                    }
+                }
+            }
+        }
+        where.onMoveOutOfGroup?.let { move ->
+            LimentyTextButton(label = "Move out of group", onClick = move)
+        }
+        LimentyTextButton(label = "Remove", onClick = where.onRemove, color = LimentyColors.Danger)
+    }
+}
 
 /**
  * A choice, shaped like the field above it.

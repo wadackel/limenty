@@ -15,6 +15,38 @@ data class KeySet(
     val scrolling: List<KeyBarSlot>,
     val pinned: List<KeyBarSlot>,
 ) {
+    fun row(pinned: Boolean): List<KeyBarSlot> = if (pinned) this.pinned else scrolling
+
+    private fun withRow(pinned: Boolean, slots: List<KeyBarSlot>): KeySet = if (pinned) copy(pinned = slots) else copy(scrolling = slots)
+
+    /**
+     * Moves the key at [key] to the end of the group at [group], from either row into either row.
+     * Unchanged when either position does not hold what it should.
+     */
+    fun moveIntoGroup(key: SlotPosition, group: SlotPosition): KeySet {
+        val moving = row(key.pinned).getOrNull(key.index) as? AuxiliaryKey ?: return this
+        val target = row(group.pinned).getOrNull(group.index) as? KeyGroup ?: return this
+        // Replaced before the key is taken out, so the group's index still means the same slot.
+        val grown = withRow(group.pinned, row(group.pinned).replaced(group.index, target.copy(keys = target.keys + moving)))
+        return grown.withRow(key.pinned, grown.row(key.pinned).filterIndexed { at, _ -> at != key.index })
+    }
+
+    /**
+     * Takes the key at [member] out of [edited] and places it right after the group at [group].
+     *
+     * The group is given rather than read from the set because it is the one being edited: the
+     * key may exist only in that edit, added or moved since the group was last saved, and the rest
+     * of the edit is kept with it.
+     */
+    fun moveOutOfGroup(group: SlotPosition, edited: KeyGroup, member: Int): KeySet {
+        val slots = row(group.pinned)
+        if (slots.getOrNull(group.index) !is KeyGroup) return this
+        val moving = edited.keys.getOrNull(member) ?: return this
+        val shrunk = edited.copy(keys = edited.keys.filterIndexed { at, _ -> at != member })
+        val updated = slots.replaced(group.index, shrunk).toMutableList().also { it.add(group.index + 1, moving) }
+        return withRow(group.pinned, updated)
+    }
+
     companion object {
         const val DEFAULT_NAME = "Default"
 
@@ -47,3 +79,11 @@ data class KeySet(
         }.getOrNull()?.takeIf { it.isNotEmpty() }
     }
 }
+
+/**
+ * A slot by where it sits in a set rather than by what it holds. Two slots can be equal (Add key
+ * starts as the Escape the default set already has), and finding one by value would act on both.
+ */
+data class SlotPosition(val pinned: Boolean, val index: Int)
+
+private fun List<KeyBarSlot>.replaced(index: Int, slot: KeyBarSlot): List<KeyBarSlot> = mapIndexed { at, it -> if (at == index) slot else it }
