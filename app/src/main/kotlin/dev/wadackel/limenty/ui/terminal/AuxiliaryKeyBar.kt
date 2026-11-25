@@ -212,7 +212,10 @@ fun AuxiliaryKeyBar(
             },
             label = "keySet",
         ) { page ->
-            BarRow(page.keys, page.pinned, BarInput(interactive && editing == null, onKeyPressed, setActions, groups, editing))
+            // Only the page arriving is edited. The one sliding out is drawn from the set it showed,
+            // and handing it the new set's drag state would let its keys overwrite the ones measured.
+            val edited = editing?.takeIf { page.index == (switcher?.index ?: 0) }
+            BarRow(page.keys, page.pinned, BarInput(interactive && editing == null, onKeyPressed, setActions, groups, edited))
         }
         if (switching != null) {
             SetMarks(switching.index, switching.count, Modifier.align(Alignment.TopCenter))

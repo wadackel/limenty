@@ -13,6 +13,7 @@ import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -224,6 +225,18 @@ class KeyBarReorderTest {
 
         onBar(last).assertIsSelected().assertIsDisplayed()
         key(last).assertIsSelected()
+    }
+
+    /** A key just added is selected before the bar has placed it, and is still brought into view. */
+    @Test
+    fun aKeyAddedAtTheEndOfALongRunIsScrolledIntoViewOnTheBar() {
+        show(wrapping)
+        rule.onNode(hasContentDescription("Add key")).performClick()
+        rule.waitForIdle()
+        rule.onAllNodes(hasText("Save") and hasClickAction() and isEnabled()).onLast().performClick()
+        rule.waitForIdle()
+
+        onBar("Esc").assertIsSelected().assertIsDisplayed()
     }
 
     /** And the other way: a key tapped on the bar is the one marked in the list. */

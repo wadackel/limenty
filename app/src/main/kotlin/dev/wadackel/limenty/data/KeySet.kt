@@ -93,8 +93,8 @@ data class KeySet(
 }
 
 /**
- * A slot by where it sits in a set rather than by what it holds. Two slots can be equal (Add key
- * starts as the Escape the default set already has), and finding one by value would act on both.
+ * A slot by where it sits in a set rather than by what it holds. Two slots can be equal (a second
+ * Esc beside the default one), and finding one by value would act on both.
  */
 data class SlotPosition(val pinned: Boolean, val index: Int)
 
