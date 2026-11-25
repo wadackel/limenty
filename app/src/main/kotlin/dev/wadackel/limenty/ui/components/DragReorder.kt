@@ -31,6 +31,16 @@ fun <T> List<T>.moved(from: Int, to: Int): List<T> {
 }
 
 /**
+ * What a reorderable group lets one item be dropped onto rather than moved past: a key onto a key
+ * group, which takes it in. [onDrop] is given the order the drag has reached, since the caller's
+ * own list may not have caught up with it yet (see [ReorderState.items]).
+ */
+class DropInto<T>(
+    val accepts: (dragged: T, onto: T) -> Boolean,
+    val onDrop: (items: List<T>, from: Int, onto: Int) -> Unit,
+)
+
+/**
  * Shared state for one reorderable group.
  *
  * Holds where each slot ended up so a drag can ask what it is over. The alternative — deciding by
@@ -52,6 +62,7 @@ class ReorderState<T> internal constructor(private val haptics: HapticFeedback) 
      */
     internal var items: List<T> = emptyList()
     internal var onReorder: (List<T>) -> Unit = {}
+    internal var dropInto: DropInto<T>? = null
 
     internal fun apply(from: Int, to: Int) {
         items = items.moved(from, to)
@@ -62,6 +73,13 @@ class ReorderState<T> internal constructor(private val haptics: HapticFeedback) 
     var dragging by mutableStateOf<Int?>(null)
         internal set
 
+    /** The item the dragged one would go into if let go now, by its position in the list, or null. */
+    var dropTarget by mutableStateOf<Int?>(null)
+        private set
+
+    /** The drop target whose zone the item last came out of, the one it may now be moved past. */
+    private var leftZone: Int? = null
+
     /** How far the finger has travelled since the item was picked up. */
     internal var offset by mutableStateOf(Offset.Zero)
 
@@ -70,6 +88,7 @@ class ReorderState<T> internal constructor(private val haptics: HapticFeedback) 
 
     internal fun start(index: Int) {
         dragging = index
+        leftZone = null
         offset = Offset.Zero
         picked = slots[index] ?: Rect.Zero
         haptics.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -86,8 +105,19 @@ class ReorderState<T> internal constructor(private val haptics: HapticFeedback) 
 
     internal fun stop() {
         dragging = null
+        dropTarget = null
         offset = Offset.Zero
     }
+
+    /** Lets go: into the drop target if there is one, otherwise where the reorder has already put it. */
+    internal fun end() {
+        val from = dragging
+        val onto = dropTarget
+        stop()
+        if (from != null && onto != null) dropInto?.onDrop(items, from, onto)
+    }
+
+    private fun takesDrop(from: Int, onto: Int): Boolean = onto != from && dropInto?.accepts(items[from], items[onto]) == true
 
     /**
      * How far along the list the dragged item has got.
@@ -104,19 +134,30 @@ class ReorderState<T> internal constructor(private val haptics: HapticFeedback) 
         offset += delta
         val from = dragging ?: return null
         val moving = picked.translate(offset).center
+
+        val over = items.indices.firstOrNull { at -> takesDrop(from, at) && slots[at]?.let { inDropZone(moving, it) } == true }
+        if (over != dropTarget) {
+            if (over == null) leftZone = dropTarget
+            dropTarget = over
+            if (over != null) haptics.performHapticFeedback(HapticFeedbackType.GestureThresholdActivate)
+        }
+        // Before the walk, which would otherwise pass the group at its middle — where a drop is
+        // aimed — and swap it away from under the item as it arrived.
+        if (over != null) return null
+
         var target = from
 
         // Bounded by the list rather than by what has been measured: a removed item's slot stays
         // in the map until something is laid out there again.
         while (target + 1 < items.size) {
             val next = slots[target + 1] ?: break
-            if (!hasPassed(moving, next, forward = true)) break
+            if (!hasPassed(moving, next, forward = true, sideways = mayPassSideways(from, target + 1))) break
             target++
         }
         if (target == from) {
             while (true) {
                 val previous = slots[target - 1] ?: break
-                if (!hasPassed(moving, previous, forward = false)) break
+                if (!hasPassed(moving, previous, forward = false, sideways = mayPassSideways(from, target - 1))) break
                 target--
             }
         }
@@ -136,11 +177,12 @@ class ReorderState<T> internal constructor(private val haptics: HapticFeedback) 
      * had not moved, and the walk stopped at the first of them — so the second line could only be
      * reached by dragging the whole way along the first.
      */
-    private fun hasPassed(moving: Offset, neighbour: Rect, forward: Boolean): Boolean {
-        val level = kotlin.math.abs(moving.y - neighbour.center.y) < neighbour.height / 2f
+    private fun hasPassed(moving: Offset, neighbour: Rect, forward: Boolean, sideways: Boolean): Boolean {
+        val level = isLevel(moving, neighbour)
         if (!level) {
             return if (forward) moving.y > neighbour.center.y else moving.y < neighbour.center.y
         }
+        if (!sideways) return false
         // Just short of the middle, not the middle itself. Dropping a key onto another key is
         // aiming at its middle, so a boundary drawn exactly there sits where the aim is best and
         // decides on a fraction of a pixel — the key then lands one place short of where it was
@@ -151,6 +193,26 @@ class ReorderState<T> internal constructor(private val haptics: HapticFeedback) 
     }
 
     /**
+     * Whether the item may move past [neighbour] along its line. A drop target is passed that way
+     * only by going through its middle and out of the far side. Judged by position alone, a key
+     * carried down onto a group's line from beside it is already past the group in reading order,
+     * so the group was moved back a place and the wrap carried it up to the line the key had just
+     * left — away from the finger that was on its way to it.
+     */
+    private fun mayPassSideways(from: Int, neighbour: Int): Boolean = !takesDrop(from, neighbour) || leftZone == neighbour
+
+    private fun isLevel(moving: Offset, slot: Rect): Boolean = kotlin.math.abs(moving.y - slot.center.y) < slot.height / 2f
+
+    /**
+     * Whether an item centred at [moving] is over the middle of [slot], level with it.
+     *
+     * The whole height rather than its middle too: on a list of full-width rows the item is already
+     * at a row's middle across as soon as it is level with it, so the walk passes the row there,
+     * before a zone shorter than the row could be reached.
+     */
+    private fun inDropZone(moving: Offset, slot: Rect): Boolean = isLevel(moving, slot) && kotlin.math.abs(moving.x - slot.center.x) <= slot.width * DROP_ZONE / 2f
+
+    /**
      * Follows the item to [target]. Its position needs no correcting here: [lift] measures it from
      * wherever it is laid out next. Correcting by the target's old corner instead assumed the item
      * lands there, which holds only when the two are the same width — a wide tab passing a narrow
@@ -159,6 +221,8 @@ class ReorderState<T> internal constructor(private val haptics: HapticFeedback) 
     internal fun settleInto(target: Int) {
         if (dragging == null) return
         dragging = target
+        // Positions have shifted, so the index no longer names the target that was left.
+        leftZone = null
         haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
     }
 }
@@ -172,12 +236,14 @@ class ReorderState<T> internal constructor(private val haptics: HapticFeedback) 
 fun <T> Modifier.reorderGroup(
     state: ReorderState<T>,
     items: List<T>,
+    dropInto: DropInto<T>? = null,
     onReorder: (List<T>) -> Unit,
 ): Modifier {
     // Not while a drag is in flight: what arrives then is the order the drag has already moved on
     // from, and taking it would undo the move that produced it.
     if (state.dragging == null) state.items = items
     state.onReorder = onReorder
+    state.dropInto = dropInto
     return onGloballyPositioned { state.container = it }
 }
 
@@ -210,7 +276,7 @@ fun Modifier.reorderable(
         .pointerInput(index, count) {
             detectDragGesturesAfterLongPress(
                 onDragStart = { state.start(index) },
-                onDragEnd = { state.stop() },
+                onDragEnd = { state.end() },
                 onDragCancel = { state.stop() },
                 onDrag = { change, delta ->
                     change.consume()
@@ -236,8 +302,9 @@ fun Modifier.reorderable(
                 val lift = state.lift(index)
                 translationX = lift.x
                 translationY = lift.y
-                scaleX = LIFTED_SCALE
-                scaleY = LIFTED_SCALE
+                val scale = if (state.dropTarget != null) DROPPING_SCALE else LIFTED_SCALE
+                scaleX = scale
+                scaleY = scale
             }
         }
         .semantics {
@@ -264,6 +331,16 @@ fun Modifier.reorderable(
 
 /** Just enough lift to read as picked up without covering its neighbours. */
 private const val LIFTED_SCALE = 1.06f
+
+/**
+ * Small enough over a drop target for the target's ring to show around it: at the lifted size a
+ * key covered all but the edge of a group no wider than itself, and which group it was going into
+ * could not be seen.
+ */
+private const val DROPPING_SCALE = 0.75f
+
+/** How much of a drop target's width, around its middle, takes the item in. */
+private const val DROP_ZONE = 0.5f
 
 /** How far short of a neighbour's middle counts as having reached it, as a share of its size. */
 private const val SETTLE_SLACK = 0.15f
