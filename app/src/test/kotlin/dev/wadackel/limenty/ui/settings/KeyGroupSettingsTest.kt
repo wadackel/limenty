@@ -16,6 +16,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.unit.dp
 import dev.wadackel.limenty.core.input.TerminalKey
 import dev.wadackel.limenty.data.AuxiliaryKey
@@ -135,6 +136,56 @@ class KeyGroupSettingsTest {
         press("Unpin")
         assertEquals(emptyList<Any>(), preferences.keySet.pinned)
         assertEquals(listOf(esc, sym), preferences.keySet.scrolling)
+    }
+
+    @Test
+    fun aKeyOnTheBarMovesIntoAGroupChosenFromTheKeyEditor() {
+        val nav = KeyGroup("nav", emptyList())
+        show(KeySet("Default", scrolling = listOf(esc, sym), pinned = listOf(nav)))
+
+        press("Esc")
+        press("Move to group")
+        press("sym")
+
+        assertEquals(listOf(KeyGroup("sym", listOf(pipe, dash, esc))), preferences.keySet.scrolling)
+        assertEquals(listOf(nav), preferences.keySet.pinned)
+    }
+
+    @Test
+    fun theKeyEditorOffersNoMoveWhenTheSetHasNoGroup() {
+        show(KeySet("Default", scrolling = listOf(esc), pinned = emptyList()))
+
+        press("Esc")
+
+        rule.onNode(hasText("Move to group")).assertDoesNotExist()
+    }
+
+    /** The group was renamed in the same editor, and the rename is kept rather than thrown away. */
+    @Test
+    fun aKeyMovedOutOfAGroupLandsRightAfterIt() {
+        show(KeySet("Default", scrolling = listOf(sym, esc), pinned = emptyList()))
+
+        press("sym")
+        rule.onNode(hasSetTextAction()).performTextReplacement("symbols")
+        press("|")
+        press("Move out of group")
+
+        assertEquals(listOf(KeyGroup("symbols", listOf(dash)), pipe, esc), preferences.keySet.scrolling)
+        rule.onNode(hasText("Key group")).assertDoesNotExist()
+    }
+
+    /** A group still being added is not on the bar, so there is nowhere after it to put a key. */
+    @Test
+    fun aKeyInAGroupBeingAddedCannotBeMovedOut() {
+        show(KeySet("Default", scrolling = listOf(esc), pinned = emptyList()))
+
+        press("Add group")
+        rule.onNode(hasContentDescription("Add key")).performClick()
+        rule.waitForIdle()
+        press("Save")
+        press("Esc")
+
+        rule.onNode(hasText("Move out of group")).assertDoesNotExist()
     }
 
     /** Nothing would be left to put on the slot's face. */

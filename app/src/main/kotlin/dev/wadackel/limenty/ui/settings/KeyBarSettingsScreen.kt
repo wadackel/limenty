@@ -60,6 +60,7 @@ import dev.wadackel.limenty.data.AuxiliaryKey
 import dev.wadackel.limenty.data.KeyBarSlot
 import dev.wadackel.limenty.data.KeyGroup
 import dev.wadackel.limenty.data.KeySet
+import dev.wadackel.limenty.data.SlotPosition
 import dev.wadackel.limenty.data.TerminalPreferences
 import dev.wadackel.limenty.ui.components.LimentyDialog
 import dev.wadackel.limenty.ui.components.LimentyDialogActions
@@ -105,8 +106,8 @@ fun KeyBarSettingsScreen(
     var naming by remember { mutableStateOf<SetNaming?>(null) }
     var deleting by remember { mutableStateOf(false) }
 
-    var editing by remember { mutableStateOf<KeySlot?>(null) }
-    var removing by remember { mutableStateOf<KeySlot?>(null) }
+    var editing by remember { mutableStateOf<SlotPosition?>(null) }
+    var removing by remember { mutableStateOf<SlotPosition?>(null) }
     var adding by remember { mutableStateOf(false) }
     var addingGroup by remember { mutableStateOf(false) }
     // Per set: a drag state keeps the slots it measured by position, and the next set's keys are
@@ -193,7 +194,7 @@ fun KeyBarSettingsScreen(
                     PinnedRow(
                         key = key,
                         dragged = pinnedOrder.dragging == index,
-                        onEdit = { editing = KeySlot(pinned = true, index) },
+                        onEdit = { editing = SlotPosition(pinned = true, index) },
                         modifier = Modifier.reorderable(pinnedOrder, index, pinned.size, key.spoken()),
                     )
                 }
@@ -222,7 +223,7 @@ fun KeyBarSettingsScreen(
                     ScrollingChip(
                         key = key,
                         dragged = scrollingOrder.dragging == index,
-                        onEdit = { editing = KeySlot(pinned = false, index) },
+                        onEdit = { editing = SlotPosition(pinned = false, index) },
                         modifier = Modifier.reorderable(scrollingOrder, index, scrolling.size, key.spoken()),
                     )
                 }
@@ -254,8 +255,29 @@ fun KeyBarSettingsScreen(
             },
         )
         when (key) {
-            is AuxiliaryKey -> AuxiliaryKeyDialog(initial = key, onDismiss = { editing = null }, onSave = onSave, placement = placement)
-            is KeyGroup -> KeyGroupDialog(initial = key, onDismiss = { editing = null }, onSave = onSave, placement = placement)
+            is AuxiliaryKey -> AuxiliaryKeyDialog(
+                initial = key,
+                onDismiss = { editing = null },
+                onSave = onSave,
+                placement = placement.copy(
+                    groups = groupsIn(set).map { (at, group) ->
+                        GroupTarget(group.label) {
+                            onChange { it.updateKeySet(index) { s -> s.moveIntoGroup(slot, at) } }
+                            editing = null
+                        }
+                    },
+                ),
+            )
+            is KeyGroup -> KeyGroupDialog(
+                initial = key,
+                onDismiss = { editing = null },
+                onSave = onSave,
+                placement = placement,
+                onMoveOut = { edited, member ->
+                    onChange { it.updateKeySet(index) { s -> s.moveOutOfGroup(slot, edited, member) } }
+                    editing = null
+                },
+            )
         }
     }
 
@@ -353,11 +375,10 @@ internal fun removalNote(slot: KeyBarSlot): String {
     }
 }
 
-/**
- * A key by where it sits rather than by what it is. Two keys can be equal (Add key starts as the
- * Escape the default set already has), and finding the one being edited by value would edit both.
- */
-private data class KeySlot(val pinned: Boolean, val index: Int)
+/** Every group in [set], pinned ones first as the settings list them, with where each sits. */
+private fun groupsIn(set: KeySet): List<Pair<SlotPosition, KeyGroup>> = listOf(true, false).flatMap { pinned ->
+    set.row(pinned).mapIndexedNotNull { at, slot -> (slot as? KeyGroup)?.let { SlotPosition(pinned, at) to it } }
+}
 
 @Composable
 private fun SetTab(
