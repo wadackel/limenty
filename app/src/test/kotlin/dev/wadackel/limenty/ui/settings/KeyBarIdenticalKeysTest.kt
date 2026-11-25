@@ -10,6 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isEnabled
+import androidx.compose.ui.test.isSelected
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.performClick
@@ -30,7 +31,7 @@ import org.robolectric.annotation.GraphicsMode
 
 /**
  * Two equal keys on the Key bar screen are still two keys: what is done to the one tapped happens
- * to it alone. Add key starts as an Escape step, so a second `Esc` beside the default one is a
+ * to it alone. A new key starts as an Escape step, so a second `Esc` beside the default one is a
  * single Save away.
  */
 @RunWith(RobolectricTestRunner::class)
@@ -84,9 +85,8 @@ class KeyBarIdenticalKeysTest {
         show(KeySet("Default", scrolling = listOf(esc, tab), pinned = listOf(esc)))
 
         press("Esc")
-        rule.onNode(hasText("Pin right")).assertExists()
-        press("Remove")
-        press("Remove")
+        rule.onNode(hasText("Scrolling") and isSelected()).assertExists()
+        press("Remove key")
 
         assertEquals(listOf(tab), preferences.keySet.scrolling)
         assertEquals(listOf(esc), preferences.keySet.pinned)

@@ -46,7 +46,6 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import dev.wadackel.limenty.core.input.TerminalKey
 import dev.wadackel.limenty.data.AuxiliaryKey
 import dev.wadackel.limenty.data.KeyBarSlot
 import dev.wadackel.limenty.data.KeyGroup
@@ -60,6 +59,7 @@ import dev.wadackel.limenty.ui.components.LimentyDialog
 import dev.wadackel.limenty.ui.components.LimentyDialogActions
 import dev.wadackel.limenty.ui.components.LimentyMenuAction
 import dev.wadackel.limenty.ui.components.LimentyNameDialog
+import dev.wadackel.limenty.ui.components.LimentySnackbar
 import dev.wadackel.limenty.ui.components.LimentyTextButton
 import dev.wadackel.limenty.ui.components.rememberReorderState
 import dev.wadackel.limenty.ui.components.reorderGroup
@@ -111,13 +111,11 @@ fun KeyBarSettingsScreen(
     var choosingSet by remember { mutableStateOf(false) }
     var deleting by remember { mutableStateOf(false) }
 
-    var editing by remember { mutableStateOf<SlotPosition?>(null) }
-    var removing by remember { mutableStateOf<SlotPosition?>(null) }
-    var adding by remember { mutableStateOf(false) }
-    var addingGroup by remember { mutableStateOf(false) }
+    var editing by remember { mutableStateOf<SheetTarget?>(null) }
+    var removed by remember { mutableStateOf<Removed?>(null) }
     val open: (SlotPosition) -> Unit = { at ->
         chosen = at
-        editing = at
+        editing = SheetTarget.Existing(at)
     }
     // Per set: a drag state keeps the slots it measured by position, and the next set's keys are
     // somewhere else.
@@ -211,8 +209,8 @@ fun KeyBarSettingsScreen(
                         modifier = Modifier.reorderable(scrollingOrder, at, scrolling.size, slot.spoken()),
                     )
                 }
-                AddTile("+", spoken = "Add key", onClick = { adding = true })
-                AddTile("+ Group", spoken = "Add group", onClick = { addingGroup = true })
+                AddTile("+", spoken = "Add key", onClick = { editing = SheetTarget.NewKey })
+                AddTile("+ Group", spoken = "Add group", onClick = { editing = SheetTarget.NewGroup })
             }
             Text(
                 "Tap a key to change it. Hold it to move it, onto a group to put it in, or onto the right end of the bar to pin it.",
@@ -221,101 +219,44 @@ fun KeyBarSettingsScreen(
                 modifier = Modifier.padding(start = margin, end = margin, top = 12.dp, bottom = 40.dp),
             )
         }
+
+        removed?.let { gone ->
+            LimentySnackbar(
+                message = "Removed ${gone.slot.label.ifBlank { gone.slot.spoken() }}",
+                action = "Undo",
+                onAction = {
+                    onChange { it.updateKeySet(gone.set) { s -> s.restored(gone.at, gone.slot) } }
+                    if (gone.set == index) chosen = gone.at
+                    removed = null
+                },
+                onTimeout = { removed = null },
+                key = gone,
+                modifier = Modifier.align(Alignment.BottomCenter),
+            )
+        }
     }
 
-    editing?.let { slot ->
-        val row = set.row(slot.pinned)
-        val onRowEdit: (List<KeyBarSlot>) -> Unit = { onRowChange(slot.pinned, it) }
-        val key = row.getOrNull(slot.index) ?: return@let
-        val withoutKey = row.filterIndexed { at, _ -> at != slot.index }
-        val onSave: (KeyBarSlot) -> Unit = { updated ->
-            onChange { it.updateKeySet(index) { s -> if (slot.pinned) s.copy(pinned = row.replacedAt(slot.index, updated)) else s.copy(scrolling = row.replacedAt(slot.index, updated)) } }
-            editing = null
-        }
-        val placement = KeyPlacement(
-            pinned = slot.pinned,
-            onTogglePin = {
-                onRowEdit(withoutKey)
-                if (slot.pinned) onScrollingChange(scrolling + key) else onPinnedChange(pinned + key)
-                editing = null
-            },
-            onRemove = {
-                editing = null
-                removing = slot
-            },
-        )
-        when (key) {
-            is AuxiliaryKey -> AuxiliaryKeyDialog(
-                initial = key,
-                onDismiss = { editing = null },
-                onSave = onSave,
-                placement = placement.copy(
-                    groups = groupsIn(set).map { (at, group) ->
-                        GroupTarget(group.label) {
-                            chosen = null
-                            onChange { it.updateKeySet(index) { s -> s.moveIntoGroup(slot, at) } }
-                            editing = null
-                        }
-                    },
-                ),
-            )
-            is KeyGroup -> KeyGroupDialog(
-                initial = key,
-                onDismiss = { editing = null },
-                onSave = onSave,
-                placement = placement,
-                onMoveOut = { edited, member ->
-                    chosen = null
-                    onChange { it.updateKeySet(index) { s -> s.moveOutOfGroup(slot, edited, member) } }
+    editing?.let { target ->
+        // A fresh draft for every slot opened, rather than the last one's left in place.
+        key(index, target) {
+            KeySlotSheet(
+                set = set,
+                target = target,
+                onSave = { edit ->
+                    val (_, landed) = set.applying(edit)
+                    onChange { it.updateKeySet(index) { s -> s.applying(edit).first } }
+                    chosen = landed
                     editing = null
                 },
+                onRemove = { at ->
+                    set.row(at.pinned).getOrNull(at.index)?.let { slot -> removed = Removed(index, at, slot) }
+                    onChange { it.updateKeySet(index) { s -> s.removed(at) } }
+                    chosen = null
+                    editing = null
+                },
+                onDismiss = { editing = null },
             )
         }
-    }
-
-    removing?.let { slot ->
-        val row = set.row(slot.pinned)
-        val key = row.getOrNull(slot.index) ?: return@let
-        LimentyDialog(title = if (key is KeyGroup) "Remove group" else "Remove key", onDismissRequest = { removing = null }) {
-            Text(removalNote(key), style = LimentyText.Body, color = LimentyColors.Text2)
-            LimentyDialogActions {
-                LimentyTextButton("Cancel", { removing = null }, color = LimentyColors.Text2)
-                LimentyTextButton(
-                    label = "Remove",
-                    onClick = {
-                        onRowChange(slot.pinned, row.filterIndexed { at, _ -> at != slot.index })
-                        removing = null
-                    },
-                    color = LimentyColors.Danger,
-                )
-            }
-        }
-    }
-
-    if (adding) {
-        AuxiliaryKeyDialog(
-            // Nameless, so the editor opens with the action's own name in the field rather than
-            // with a placeholder the key would then be stuck carrying.
-            initial = AuxiliaryKey(label = "", key = TerminalKey.Escape),
-            onDismiss = { adding = false },
-            onSave = { added ->
-                onScrollingChange(scrolling + added)
-                chosen = SlotPosition(pinned = false, scrolling.size)
-                adding = false
-            },
-        )
-    }
-
-    if (addingGroup) {
-        KeyGroupDialog(
-            initial = KeyGroup(name = "", keys = emptyList()),
-            onDismiss = { addingGroup = false },
-            onSave = { added ->
-                onScrollingChange(scrolling + added)
-                chosen = SlotPosition(pinned = false, scrolling.size)
-                addingGroup = false
-            },
-        )
     }
 
     if (choosingSet) {
@@ -390,18 +331,19 @@ fun KeyBarSettingsScreen(
     }
 }
 
+/** A slot just removed, kept for as long as Undo is offered, with the set and the place it came from. */
+private class Removed(val set: Int, val at: SlotPosition, val slot: KeyBarSlot)
+
 /** Where a key carried from the list is pinned, as the bar last reported it. Read only by the drag. */
 private class PinZone {
     var rect: Rect? = null
 }
 
-private fun List<KeyBarSlot>.replacedAt(index: Int, slot: KeyBarSlot): List<KeyBarSlot> = mapIndexed { at, it -> if (at == index) slot else it }
-
 private enum class SetNaming { Rename, Duplicate, New }
 
 private enum class SetAction { Rename, Duplicate, New, Delete }
 
-/** A group's keys go with it, so the confirmation says so rather than leaving it to be found out. */
+/** A group's keys go with it, so the question before removing it says so rather than leaving it to be found out. */
 internal fun removalNote(slot: KeyBarSlot): String {
     val name = slot.label.ifBlank { slot.spoken() }
     return when {
@@ -411,8 +353,8 @@ internal fun removalNote(slot: KeyBarSlot): String {
     }
 }
 
-/** Every group in [set], pinned ones first as the settings list them, with where each sits. */
-private fun groupsIn(set: KeySet): List<Pair<SlotPosition, KeyGroup>> = listOf(true, false).flatMap { pinned ->
+/** Every group in [set], pinned ones first, with where each sits. */
+internal fun groupsIn(set: KeySet): List<Pair<SlotPosition, KeyGroup>> = listOf(true, false).flatMap { pinned ->
     set.row(pinned).mapIndexedNotNull { at, slot -> (slot as? KeyGroup)?.let { SlotPosition(pinned, at) to it } }
 }
 

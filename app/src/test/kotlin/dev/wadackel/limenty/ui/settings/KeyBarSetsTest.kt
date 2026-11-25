@@ -156,8 +156,7 @@ class KeyBarSetsTest {
 
         fromMenu("Agent")
         press("Xxx")
-        press("Remove")
-        press("Remove")
+        press("Remove key")
 
         assertEquals(vim, preferences.keySets[0])
         assertEquals(listOf("Yyy"), preferences.keySets[1].scrolling.map { it.label })

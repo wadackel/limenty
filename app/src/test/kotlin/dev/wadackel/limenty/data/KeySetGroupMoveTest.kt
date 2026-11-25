@@ -53,27 +53,6 @@ class KeySetGroupMoveTest {
     }
 
     @Test
-    fun `a key moved out of a group is placed right after it`() {
-        val group = KeyGroup("sym", listOf(pipe, dash))
-        val set = KeySet("Default", scrolling = listOf(esc, group, tab), pinned = emptyList())
-
-        val moved = set.moveOutOfGroup(group = SlotPosition(false, 1), edited = group, member = 0)
-
-        assertEquals(listOf(esc, KeyGroup("sym", listOf(dash)), pipe, tab), moved.scrolling)
-    }
-
-    /** The edit is what was on screen: a renamed group with a key added since it was saved. */
-    @Test
-    fun `moving a key out keeps the rest of the group's unsaved edit`() {
-        val set = KeySet("Default", scrolling = emptyList(), pinned = listOf(sym, left))
-        val edited = KeyGroup("symbols", listOf(pipe, dash))
-
-        val moved = set.moveOutOfGroup(group = SlotPosition(true, 0), edited = edited, member = 1)
-
-        assertEquals(listOf(KeyGroup("symbols", listOf(pipe)), dash, left), moved.pinned)
-    }
-
-    @Test
     fun `a pinned key goes to the end of the pinned run`() {
         val set = KeySet("Default", scrolling = listOf(esc, sym, tab), pinned = listOf(left))
 

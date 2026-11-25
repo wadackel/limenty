@@ -19,6 +19,7 @@ import dev.wadackel.limenty.core.input.Modifiers
 import dev.wadackel.limenty.core.input.TerminalKey
 import dev.wadackel.limenty.data.AuxiliaryKey
 import dev.wadackel.limenty.data.KeySet
+import dev.wadackel.limenty.data.SlotPosition
 import dev.wadackel.limenty.data.TerminalPreferences
 import dev.wadackel.limenty.ui.theme.LimentyTheme
 import org.junit.Assert.assertEquals
@@ -47,7 +48,13 @@ class KeyLabelTest {
     private fun edit(initial: AuxiliaryKey) {
         rule.setContent {
             LimentyTheme {
-                AuxiliaryKeyDialog(initial = initial, onDismiss = {}, onSave = { saved = it })
+                KeySlotSheet(
+                    set = KeySet("Default", listOf(initial), emptyList()),
+                    target = SheetTarget.Existing(SlotPosition(pinned = false, index = 0)),
+                    onSave = { saved = it.slot as AuxiliaryKey },
+                    onRemove = {},
+                    onDismiss = {},
+                )
             }
         }
     }
@@ -80,7 +87,7 @@ class KeyLabelTest {
     @Test
     fun aNameCanBeHandedBack() {
         edit(AuxiliaryKey("Clear", codePoint = 'l'.code, modifiers = Modifiers.Ctrl))
-        rule.onNodeWithText("Use key name").performClick()
+        rule.onNodeWithText("Use keys").performClick()
         rule.onNodeWithText("Save").performClick()
         assertEquals("⌃l", saved?.label)
     }
