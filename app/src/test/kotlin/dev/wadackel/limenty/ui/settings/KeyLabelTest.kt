@@ -8,7 +8,15 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isDialog
+import androidx.compose.ui.test.isEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -59,27 +67,25 @@ class KeyLabelTest {
         }
     }
 
-    /** Opens the action picker and takes the named key from it. */
-    private fun chooseAction(from: String, to: String) {
-        rule.onNodeWithText(from).performClick()
-        rule.onNodeWithText(to).performClick()
+    /** Takes the last step off, then presses [key] on the editor's keyboard in its place. */
+    private fun replaceLastStepWith(spokenKey: String) {
+        rule.onNodeWithContentDescription("Delete last step").performClick()
+        rule.onNode(hasContentDescription(spokenKey) and hasClickAction()).performClick()
         rule.waitForIdle()
     }
 
     @Test
-    fun changingTheActionRenamesAKeyThatHasNoNameOfItsOwn() {
+    fun changingTheKeysRenamesAKeyThatHasNoNameOfItsOwn() {
         edit(AuxiliaryKey("Esc", key = TerminalKey.Escape))
-        chooseAction(from = "Escape", to = "PageDown")
+        replaceLastStepWith("Page Down")
         rule.onNodeWithText("Save").performClick()
         assertEquals("PgDn", saved?.label)
     }
 
     @Test
-    fun changingTheActionLeavesANameSomeoneChose() {
-        // Named action rather than a character: with a character chosen, the word `Character` is
-        // both the picker's label and the field's, and there is no one node to press.
+    fun changingTheKeysLeavesANameSomeoneChose() {
         edit(AuxiliaryKey("Clear", key = TerminalKey.Escape))
-        chooseAction(from = "Escape", to = "PageDown")
+        replaceLastStepWith("Page Down")
         rule.onNodeWithText("Save").performClick()
         assertEquals("Clear", saved?.label)
     }
@@ -102,9 +108,9 @@ class KeyLabelTest {
         assertEquals("Bail out", saved?.label)
     }
 
-    /** A key added from the list arrives named, not carrying a placeholder it is stuck with. */
+    /** A key added from the list starts empty and is named after the first key pressed for it. */
     @Test
-    fun anAddedKeyArrivesNamedAfterItsAction() {
+    fun anAddedKeyIsNamedAfterTheKeysPressedForIt() {
         var preferences by mutableStateOf(TerminalPreferences(keySets = listOf(KeySet("Default", emptyList(), emptyList()))))
         rule.setContent {
             LimentyTheme {
@@ -118,16 +124,19 @@ class KeyLabelTest {
             }
         }
         rule.onNodeWithContentDescription("Add key").performClick()
+        rule.onNode(hasText("Save") and isEnabled()).assertDoesNotExist()
+        rule.onNode(hasContentDescription("Escape") and hasClickAction() and hasAnyAncestor(isDialog())).performClick()
         rule.onNodeWithText("Save").performClick()
         rule.waitForIdle()
         assertEquals(listOf("Esc"), preferences.keySet.scrolling.map { it.label })
     }
 
     /**
-     * The SENDS row names each step by the same rule as a key face, so it shows symbols too.
+     * The row of steps names each one by the same rule as a key face, so it shows symbols too.
      *
      * Asserted on the node rather than in a screenshot: the editor opens in a window of its own,
-     * which the root capture does not reach.
+     * which the root capture does not reach. The first match is the step; the keyboard below it
+     * draws the same faces.
      */
     @Test
     fun eachStepIsNamedTheWayAKeyFaceIs() {
@@ -142,7 +151,7 @@ class KeyLabelTest {
             ),
         )
         rule.onNodeWithText("⌃s").assertIsDisplayed()
-        rule.onNodeWithText("⏎").assertIsDisplayed()
-        rule.onNodeWithText("␣").assertIsDisplayed()
+        rule.onAllNodesWithText("⏎").onFirst().assertIsDisplayed()
+        rule.onAllNodesWithText("␣").onFirst().assertIsDisplayed()
     }
 }

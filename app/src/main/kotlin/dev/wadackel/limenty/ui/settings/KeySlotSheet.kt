@@ -35,7 +35,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.wadackel.limenty.core.input.KeyStep
-import dev.wadackel.limenty.core.input.TerminalKey
 import dev.wadackel.limenty.data.AuxiliaryKey
 import dev.wadackel.limenty.data.KeyBarSlot
 import dev.wadackel.limenty.data.KeyGroup
@@ -85,9 +84,7 @@ internal data class KeyDraft(val ownLabel: String?, val steps: List<KeyStep>) {
     val saveable: Boolean get() = key.label.isNotBlank() && sendsEveryStep(steps)
 
     companion object {
-        // Never without a step: the editor needs one to show its fields, and a key stored with no
-        // steps sends nothing, which an empty step already says.
-        fun of(key: AuxiliaryKey) = KeyDraft(if (key.hasOwnName()) key.label else null, key.steps.ifEmpty { listOf(KeyStep.Press()) })
+        fun of(key: AuxiliaryKey) = KeyDraft(if (key.hasOwnName()) key.label else null, key.steps)
     }
 }
 
@@ -116,9 +113,8 @@ internal fun KeySlotSheet(
     val from = (target as? SheetTarget.Existing)?.at
     val original: KeyBarSlot = when (target) {
         is SheetTarget.Existing -> set.row(target.at.pinned).getOrNull(target.at.index) ?: return
-        // Nameless, so the editor opens with the key's own name in the field rather than a
-        // placeholder the key would then be stuck carrying.
-        SheetTarget.NewKey -> AuxiliaryKey(label = "", key = TerminalKey.Escape)
+        // Nothing yet, so the first key pressed is the key rather than a replacement for one.
+        SheetTarget.NewKey -> AuxiliaryKey(label = "", steps = emptyList())
         SheetTarget.NewGroup -> KeyGroup(name = "", keys = emptyList())
     }
     var key by remember { mutableStateOf((original as? AuxiliaryKey)?.let(KeyDraft::of)) }
@@ -134,8 +130,8 @@ internal fun KeySlotSheet(
 
     val isGroup = original is KeyGroup
     val edited: KeyBarSlot = if (isGroup) KeyGroup(groupName, members.map { it.key }) else key!!.key
-    // Read back through the draft, so a key the draft fills in on opening — a step added to one
-    // that had none — is not taken for a change the owner made.
+    // Read back through the draft, so a label that only repeats what the steps say is not taken
+    // for a name the owner gave.
     val baseline: KeyBarSlot = when (original) {
         is KeyGroup -> original.copy(keys = original.keys.map { KeyDraft.of(it).key })
         is AuxiliaryKey -> KeyDraft.of(original).key
@@ -237,7 +233,7 @@ internal fun KeySlotSheet(
                     },
                     onAdd = {
                         val added = members.size
-                        members = members + KeyDraft.of(AuxiliaryKey(label = "", key = TerminalKey.Escape))
+                        members = members + KeyDraft(ownLabel = null, steps = emptyList())
                         takenOut = null
                         page = added
                     },
