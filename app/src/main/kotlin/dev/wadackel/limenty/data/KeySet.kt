@@ -12,8 +12,8 @@ import org.json.JSONObject
  */
 data class KeySet(
     val name: String,
-    val scrolling: List<AuxiliaryKey>,
-    val pinned: List<AuxiliaryKey>,
+    val scrolling: List<KeyBarSlot>,
+    val pinned: List<KeyBarSlot>,
 ) {
     companion object {
         const val DEFAULT_NAME = "Default"

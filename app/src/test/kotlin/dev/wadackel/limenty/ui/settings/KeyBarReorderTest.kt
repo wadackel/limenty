@@ -18,6 +18,7 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.dp
 import dev.wadackel.limenty.core.input.TerminalKey
 import dev.wadackel.limenty.data.AuxiliaryKey
+import dev.wadackel.limenty.data.KeyBarSlot
 import dev.wadackel.limenty.data.KeySet
 import dev.wadackel.limenty.data.TerminalPreferences
 import dev.wadackel.limenty.ui.components.moved
@@ -62,8 +63,8 @@ class KeyBarReorderTest {
     // Compose state, not plain fields: the screen has to re-render with the list a drag produced,
     // or the next step of that same drag is computed from the list as it was before it started.
     private var preferences by mutableStateOf(TerminalPreferences())
-    private var lastScrolling by mutableStateOf<List<AuxiliaryKey>?>(null)
-    private var lastPinned by mutableStateOf<List<AuxiliaryKey>?>(null)
+    private var lastScrolling by mutableStateOf<List<KeyBarSlot>?>(null)
+    private var lastPinned by mutableStateOf<List<KeyBarSlot>?>(null)
 
     private val vim = KeySet("Vim", scrolling, pinnedKeys)
     private val agent = KeySet("Agent", listOf(AuxiliaryKey("Yyy", key = TerminalKey.Enter)), emptyList())

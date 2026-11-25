@@ -28,6 +28,18 @@ object LimentyColors {
     /** The nearest surface: a connected host, a dialog, a key that scrolls. */
     val Surface3 = Color(0xFF25242A)
 
+    /** A key on a [Surface3]: a key in a key group's popup. */
+    val Surface4 = Color(0xFF302F36)
+
+    /** A key group's slot while its popup is open. */
+    val Surface5 = Color(0xFF3E3C46)
+
+    /**
+     * The key under a finger sliding across a key group's popup. Lighter rather than accented,
+     * because the popup is drawn over the terminal and the accent stays off keys there.
+     */
+    val KeyUnderFinger = Color(0xFF5A5866)
+
     /** A hairline between things that sit on the same surface: the key bar's pinned edge. */
     val Line = Color(0xFF36343B)
 

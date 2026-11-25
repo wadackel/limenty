@@ -25,7 +25,10 @@ There are no borders. A surface that is nearer is lighter:
 | `Bg` | `#0C0C0F` | the screen |
 | `Surface` | `#17161B` | a card, a settings group, the detail pane on the unfolded display, the key bar |
 | `Surface2` | `#1E1D22` | a surface placed on a surface (a group inside the detail pane), a pinned key, a field |
-| `Surface3` | `#25242A` | the nearest thing: a dialog, a key that scrolls |
+| `Surface3` | `#25242A` | the nearest thing: a dialog, a key that scrolls, a key group's popup |
+| `Surface4` | `#302F36` | a key in a key group's popup |
+| `Surface5` | `#3E3C46` | a key group's slot while its popup is open |
+| `KeyUnderFinger` | `#5A5866` | the key under a finger sliding across a key group's popup |
 | `Line` | `#36343B` | the rare hairline between things on one surface (the key bar's pinned edge) |
 
 The greys lean slightly towards the accent's hue (oklch hue 295, about 60% of the way from neutral).

@@ -29,9 +29,9 @@ fun AuxiliaryKey(
  * things can be called something shorter than the list of them.
  */
 data class AuxiliaryKey(
-    val label: String,
+    override val label: String,
     val steps: List<KeyStep>,
-) {
+) : KeyBarSlot {
     fun toEvents(): List<TerminalInputEvent> = steps.mapNotNull { it.toEvent() }
 
     /**
@@ -49,7 +49,7 @@ data class AuxiliaryKey(
      * worse than saying "Left". The substitution stops at a key the owner named, though — someone
      * who calls a key `Clear` wants to hear `Clear`, not `Escape`.
      */
-    fun spoken(): String = if (hasOwnName()) label else spokenFor(steps).ifEmpty { "Unassigned" }
+    override fun spoken(): String = if (hasOwnName()) label else spokenFor(steps).ifEmpty { "Unassigned" }
 
     companion object {
         /**
@@ -211,14 +211,29 @@ data class AuxiliaryKey(
             if (shift) append("⇧")
         }
 
-        /** JSON rather than a delimited string, so a label can contain any character at all. */
-        fun encodeBar(keys: List<AuxiliaryKey>): String {
+        /**
+         * JSON rather than a delimited string, so a label can contain any character at all.
+         *
+         * A group keeps its name under `label` and has no `steps`, which is how a build without
+         * groups reads it: a key with the group's name that sends nothing, rather than a bar it
+         * cannot read and replaces with the defaults.
+         */
+        fun encodeBar(slots: List<KeyBarSlot>): String {
             val array = JSONArray()
-            keys.forEach { entry ->
-                array.put(JSONObject().put("label", entry.label).put("steps", KeyStepJson.encodeAll(entry.steps)))
+            slots.forEach { slot ->
+                array.put(
+                    when (slot) {
+                        is AuxiliaryKey -> encodeKey(slot)
+                        is KeyGroup -> JSONObject()
+                            .put("label", slot.name)
+                            .put("group", JSONArray().also { members -> slot.keys.forEach { members.put(encodeKey(it)) } })
+                    },
+                )
             }
             return array.toString()
         }
+
+        private fun encodeKey(key: AuxiliaryKey): JSONObject = JSONObject().put("label", key.label).put("steps", KeyStepJson.encodeAll(key.steps))
 
         /**
          * Reads both shapes, because the older one is what is on the owner's phone.
@@ -227,20 +242,32 @@ data class AuxiliaryKey(
          * so a format that could not read what came before would quietly replace a configured bar
          * with a stock one on first launch. Three lines is a cheap price for not doing that.
          */
-        fun decodeBar(encoded: String): List<AuxiliaryKey>? = runCatching {
+        fun decodeBar(encoded: String): List<KeyBarSlot>? = runCatching {
             val array = JSONArray(encoded)
             (0 until array.length()).map { index ->
                 val item = array.getJSONObject(index)
-                val stored = item.optJSONArray("steps")
-                AuxiliaryKey(
-                    label = item.getString("label"),
-                    steps = if (stored == null) {
-                        listOf(KeyStepJson.decode(item))
-                    } else {
-                        KeyStepJson.decodeAll(stored)
-                    },
-                )
+                val members = item.optJSONArray("group")
+                if (members == null) {
+                    decodeKey(item)
+                } else {
+                    KeyGroup(
+                        name = item.getString("label"),
+                        keys = (0 until members.length()).map { decodeKey(members.getJSONObject(it)) },
+                    )
+                }
             }
         }.getOrNull()
+
+        private fun decodeKey(item: JSONObject): AuxiliaryKey {
+            val stored = item.optJSONArray("steps")
+            return AuxiliaryKey(
+                label = item.getString("label"),
+                steps = if (stored == null) {
+                    listOf(KeyStepJson.decode(item))
+                } else {
+                    KeyStepJson.decodeAll(stored)
+                },
+            )
+        }
     }
 }
