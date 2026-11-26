@@ -67,6 +67,12 @@ class KeyLabelTest {
         }
     }
 
+    /** Saves, then waits out the sheet being lowered, which the edit is handed over after. */
+    private fun save() {
+        rule.onNodeWithText("Save").performClick()
+        rule.waitForIdle()
+    }
+
     /** Takes the last step off, then presses [key] on the editor's keyboard in its place. */
     private fun replaceLastStepWith(spokenKey: String) {
         rule.onNodeWithContentDescription("Delete last step").performClick()
@@ -78,7 +84,7 @@ class KeyLabelTest {
     fun changingTheKeysRenamesAKeyThatHasNoNameOfItsOwn() {
         edit(AuxiliaryKey("Esc", key = TerminalKey.Escape))
         replaceLastStepWith("Page Down")
-        rule.onNodeWithText("Save").performClick()
+        save()
         assertEquals("PgDn", saved?.label)
     }
 
@@ -86,7 +92,7 @@ class KeyLabelTest {
     fun changingTheKeysLeavesANameSomeoneChose() {
         edit(AuxiliaryKey("Clear", key = TerminalKey.Escape))
         replaceLastStepWith("Page Down")
-        rule.onNodeWithText("Save").performClick()
+        save()
         assertEquals("Clear", saved?.label)
     }
 
@@ -94,7 +100,7 @@ class KeyLabelTest {
     fun aNameCanBeHandedBack() {
         edit(AuxiliaryKey("Clear", codePoint = 'l'.code, modifiers = Modifiers.Ctrl))
         rule.onNodeWithText("Use keys").performClick()
-        rule.onNodeWithText("Save").performClick()
+        save()
         assertEquals("⌃l", saved?.label)
     }
 
@@ -104,7 +110,7 @@ class KeyLabelTest {
         // label that reads the same gives the field no node of its own to type into.
         edit(AuxiliaryKey("Clear", key = TerminalKey.Escape))
         rule.onNodeWithText("Clear").performTextReplacement("Bail out")
-        rule.onNodeWithText("Save").performClick()
+        save()
         assertEquals("Bail out", saved?.label)
     }
 
@@ -126,7 +132,7 @@ class KeyLabelTest {
         rule.onNodeWithContentDescription("Add key").performClick()
         rule.onNode(hasText("Save") and isEnabled()).assertDoesNotExist()
         rule.onNode(hasContentDescription("Escape") and hasClickAction() and hasAnyAncestor(isDialog())).performClick()
-        rule.onNodeWithText("Save").performClick()
+        save()
         rule.waitForIdle()
         assertEquals(listOf("Esc"), preferences.keySet.scrolling.map { it.label })
     }

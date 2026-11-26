@@ -11,6 +11,7 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
@@ -24,6 +25,8 @@ import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeDown
 import androidx.compose.ui.unit.dp
 import dev.wadackel.limenty.core.input.TerminalKey
 import dev.wadackel.limenty.data.AuxiliaryKey
@@ -175,6 +178,51 @@ class KeySlotSheetTest {
 
         rule.onNode(hasText("Discard changes?")).assertDoesNotExist()
         rule.onNode(isDialog()).assertDoesNotExist()
+    }
+
+    /** Pulls the sheet down by its title, [by] pixels over [millis]. */
+    private fun pullDown(title: String, by: Float, millis: Long = 200) {
+        rule.onNode(hasText(title) and hasAnyAncestor(isDialog())).performTouchInput {
+            swipeDown(startY = centerY, endY = centerY + by, durationMillis = millis)
+        }
+        rule.waitForIdle()
+    }
+
+    @Test
+    fun pullingTheSheetDownWithoutAChangeClosesIt() {
+        show(KeySet("Default", scrolling = listOf(sym), pinned = emptyList()))
+
+        press("sym")
+        pullDown("Group", by = 2000f)
+
+        rule.onNode(hasText("Discard changes?")).assertDoesNotExist()
+        rule.onNode(isDialog()).assertDoesNotExist()
+    }
+
+    @Test
+    fun pullingTheSheetDownALittleLeavesItOpen() {
+        show(KeySet("Default", scrolling = listOf(sym), pinned = emptyList()))
+
+        press("sym")
+        pullDown("Group", by = 60f, millis = 1000)
+
+        rule.onNode(isDialog()).assertExists()
+        rule.onNode(hasText("Group") and hasAnyAncestor(isDialog())).assertIsDisplayed()
+    }
+
+    @Test
+    fun pullingTheSheetDownAfterAChangeAsksBeforeAnythingIsThrownAway() {
+        show(KeySet("Default", scrolling = listOf(sym), pinned = emptyList()))
+
+        press("sym")
+        press("Pinned")
+        pullDown("Group", by = 2000f)
+
+        rule.onNode(hasText("Discard changes?")).assertIsDisplayed()
+        press("Keep editing")
+        press("Save")
+
+        assertEquals(listOf(sym), preferences.keySet.pinned)
     }
 
     /** Both parts of one edit are kept: the old Pin right moved the key and dropped the label. */

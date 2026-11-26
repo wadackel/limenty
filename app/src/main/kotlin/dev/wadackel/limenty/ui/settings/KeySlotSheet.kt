@@ -63,6 +63,7 @@ import dev.wadackel.limenty.ui.components.LimentySnackbar
 import dev.wadackel.limenty.ui.components.LimentyTextButton
 import dev.wadackel.limenty.ui.components.LimentyTextButtonInset
 import dev.wadackel.limenty.ui.components.SectionHeading
+import dev.wadackel.limenty.ui.components.rememberLimentySheetState
 import dev.wadackel.limenty.ui.components.rememberReorderState
 import dev.wadackel.limenty.ui.components.reorderGroup
 import dev.wadackel.limenty.ui.components.reorderable
@@ -163,18 +164,32 @@ internal fun KeySlotSheet(
     val groupLabel = KeyGroup(groupName, members.map { it.key }, groupIcon).label.ifBlank { "Group" }
     val member = page?.takeIf { it in members.indices }
 
-    val close: () -> Unit = { if (changed) asking = Question.Discard else onDismiss() }
+    // The sheet is lowered before the screen behind it hears of the outcome, so it goes as it came.
+    val sheet = rememberLimentySheetState()
+    val dismiss: () -> Unit = {
+        asking = null
+        sheet.hide(onDismiss)
+    }
+    val remove: (SlotPosition) -> Unit = { at ->
+        asking = null
+        sheet.hide { onRemove(at) }
+    }
+    val close: () -> Unit = { if (changed) asking = Question.Discard else dismiss() }
     val back: () -> Unit = {
         page = null
         takenOut = null
     }
-    val save: () -> Unit = { onSave(SlotEdit(from, edited, pinned, into.takeIf { !isGroup }, movedOut)) }
+    val save: () -> Unit = {
+        val edit = SlotEdit(from, edited, pinned, into.takeIf { !isGroup }, movedOut)
+        sheet.hide { onSave(edit) }
+    }
     val openIcons: () -> Unit = {
         takenOut = null
         picking = true
     }
 
     LimentySheet(
+        state = sheet,
         onDismissRequest = {
             when {
                 picking -> picking = false
@@ -182,7 +197,7 @@ internal fun KeySlotSheet(
                 else -> close()
             }
         },
-        onTapOutside = close,
+        onCloseRequest = close,
         header = {
             when {
                 picking -> {
@@ -212,11 +227,11 @@ internal fun KeySlotSheet(
                     body = "Your changes to ${original.label.ifBlank { if (isGroup) "this group" else "this key" }} have not been saved.",
                 ) {
                     LimentyTextButton("Keep editing", { asking = null }, color = LimentyColors.Text2)
-                    LimentyTextButton("Discard", onDismiss, color = LimentyColors.Danger)
+                    LimentyTextButton("Discard", dismiss, color = LimentyColors.Danger)
                 }
                 Question.RemoveGroup -> LimentySheetQuestion(title = "Remove group", body = removalNote(original)) {
                     LimentyTextButton("Cancel", { asking = null }, color = LimentyColors.Text2)
-                    LimentyTextButton("Remove", { from?.let(onRemove) }, color = LimentyColors.Danger)
+                    LimentyTextButton("Remove", { from?.let(remove) }, color = LimentyColors.Danger)
                 }
                 null -> Unit
             }
@@ -310,7 +325,7 @@ internal fun KeySlotSheet(
                     PositionChoice(pinned = pinned, onPinnedChange = { pinned = it })
                     if (from != null) {
                         RemoveButton("Remove group") {
-                            if ((original as KeyGroup).keys.isEmpty()) onRemove(from) else asking = Question.RemoveGroup
+                            if ((original as KeyGroup).keys.isEmpty()) remove(from) else asking = Question.RemoveGroup
                         }
                     }
                 }
@@ -326,7 +341,7 @@ internal fun KeySlotSheet(
                         into = into,
                         onIntoChange = { into = it },
                     )
-                    if (from != null) RemoveButton("Remove key") { onRemove(from) }
+                    if (from != null) RemoveButton("Remove key") { remove(from) }
                 }
             }
         }
