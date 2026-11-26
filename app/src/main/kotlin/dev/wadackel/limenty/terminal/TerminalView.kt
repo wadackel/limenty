@@ -403,13 +403,17 @@ class TerminalView(context: Context) : TerminalInputView(context) {
         setIsLongpressEnabled(false)
     }
 
-    /** Set once the long press has fired, until the next press: the detector is out of it by then. */
+    /** Set once the long press has fired, until the next press. */
     private var longPressFired = false
+
+    /** Whether the detector is kept out of the press, from the long press until a second finger lands. */
+    private var detectorOut = false
 
     private val longPress = LongPressTimer(context, repeatHandler) { down -> longPressed(down) }
 
     private fun longPressed(down: MotionEvent) {
         longPressFired = true
+        detectorOut = true
         gestureLog.d("longpress", "afterMillis" to SystemClock.uptimeMillis() - down.downTime)
         // The detector would otherwise take the lift for a tap, and the moves after it for a scroll,
         // which its own long press used to stop it doing.
@@ -537,7 +541,9 @@ class TerminalView(context: Context) : TerminalInputView(context) {
             MotionEvent.ACTION_POINTER_DOWN -> if (event.pointerCount == 2) sawSecondPointer = true
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                 val quick = event.eventTime - twoFingerDownAt < TWO_FINGER_TAP_TIMEOUT_MILLIS
-                if (sawSecondPointer && quick && !scaleDetector.isInProgress && !dragBehaviourFired) {
+                // A press time shorter than the tap's window, or a deep press, can fire the long
+                // press first, and one touch would then do both.
+                if (sawSecondPointer && quick && !scaleDetector.isInProgress && !dragBehaviourFired && !longPressFired) {
                     perform(Gesture.TwoFingerTap, event)
                 }
                 sawSecondPointer = false
@@ -912,7 +918,7 @@ class TerminalView(context: Context) : TerminalInputView(context) {
             releaseHeldPress()
             // The detector's own long press ended here as well, and the fingers went back to
             // scrolling and two-finger swipes.
-            longPressFired = false
+            detectorOut = false
         }
         if (event.actionMasked == MotionEvent.ACTION_MOVE) {
             if (longPress.move(event)) return true
@@ -928,6 +934,7 @@ class TerminalView(context: Context) : TerminalInputView(context) {
         }
         if (event.actionMasked == MotionEvent.ACTION_DOWN) {
             longPressFired = false
+            detectorOut = false
             longPress.start(event, (arrowPad.pressTimeMillis ?: ViewConfiguration.getLongPressTimeout()).toLong())
             releaseHeldPress()
             scrollRemainder = 0f
@@ -956,7 +963,7 @@ class TerminalView(context: Context) : TerminalInputView(context) {
             grabOffsetY = 0f
             dismissMagnifier()
         }
-        if (longPressFired) return true
+        if (detectorOut) return true
         return gestureDetector.onTouchEvent(event) || super.onTouchEvent(event)
     }
 

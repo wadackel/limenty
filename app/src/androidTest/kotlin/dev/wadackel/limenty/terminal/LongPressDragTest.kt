@@ -38,9 +38,9 @@ import java.util.concurrent.CopyOnWriteArrayList
 /**
  * A long press held still selects the word under it; a long press that moves sends arrow keys.
  *
- * The long press is a real one: the platform's detector has to have fired it, because the moves
- * that follow are exactly what it drops once it has, and a test that called the helpers directly
- * would never see that.
+ * The long press is a real one: its timer has to have fired on the main looper, which then takes
+ * the platform's gesture detector out of the press, and the moves and the lift that follow are
+ * exactly what that changes. A test that called the helpers directly would never see that.
  */
 @RunWith(AndroidJUnit4::class)
 class LongPressDragTest {
@@ -328,6 +328,26 @@ class LongPressDragTest {
         Touch(target, x, y).press().secondFingerDrag(gap = WIDTH / 3f, dx = target.metrics.cellWidth * 4).lift()
 
         assertThat(keys()).containsExactly(TerminalKey.Enter)
+    }
+
+    /** The shortest press time is inside a two-finger tap's window, and one touch must not do both. */
+    @Test
+    fun aTwoFingerTapThatOutlastsAShortPressTimeIsOnlyTheLongPress() {
+        val tab = GestureBehaviour.SendKeys(listOf(KeyStep.Press(key = TerminalKey.Tab)))
+        val short = ArrowPadSettings.PressTime.min.toLong()
+        val target = view(
+            bindings = GestureBindings.Initial.with(Gesture.TwoFingerTap, tab),
+            pad = ArrowPadSettings(pressTimeMillis = short.toInt()),
+        )
+        val (x, y) = cellCentre(target, 0, 8)
+
+        // Held for real rather than back-dated, so the down's own time and the tap's window agree.
+        val touch = Touch(target, x, y, heldFor = 0).press().hold(short + SHORT_PRESS_MARGIN_MILLIS / 2)
+        val opened = padOpen(target)
+        touch.secondFingerDrag(gap = WIDTH / 3f, dx = 0f, steps = 1).lift()
+
+        assertThat(opened).isTrue()
+        assertThat(sent).isEmpty()
     }
 
     @Test
