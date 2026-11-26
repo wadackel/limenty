@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
+import dev.wadackel.limenty.core.input.ArrowPadSettings
 import dev.wadackel.limenty.core.input.Gesture
 import dev.wadackel.limenty.core.input.GestureBehaviour
 import dev.wadackel.limenty.core.input.KeyStep
@@ -317,5 +318,47 @@ class TerminalSettingsTest {
     @Test
     fun doubleTapDragIsOffUntilItIsAskedFor() {
         assertThat(storedValues().doubleTapDragZoom).isFalse()
+    }
+
+    @Test
+    fun theArrowPadTimingIsRememberedAcrossRestarts() {
+        val tuned = ArrowPadSettings(pressTimeMillis = 650, repeatDelayMillis = 250, repeatIntervalMillis = 90, deadZoneDp = 40)
+        writeSettings { it.copy(arrowPad = tuned) }
+
+        assertThat(storedValues().arrowPad).isEqualTo(tuned)
+    }
+
+    /** Settings saved before the pad could be tuned have none of its keys, and keep its old timing. */
+    @Test
+    fun settingsSavedBeforeTheArrowPadCouldBeTunedReadAsItsDefaults() {
+        context.getSharedPreferences("limenty-settings", Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean("keepAwake", false)
+            .commit()
+
+        assertThat(storedValues().arrowPad).isEqualTo(ArrowPadSettings())
+    }
+
+    @Test
+    fun aPressTimeSetBackToTheSystemIsRememberedAsTheSystem() {
+        writeSettings { it.copy(arrowPad = ArrowPadSettings(pressTimeMillis = 900)) }
+        writeSettings { it.copy(arrowPad = it.arrowPad.copy(pressTimeMillis = null)) }
+
+        assertThat(storedValues().arrowPad.pressTimeMillis).isNull()
+    }
+
+    @Test
+    fun anArrowPadValueNoSliderCanReachIsPulledOntoItsRange() {
+        context.getSharedPreferences("limenty-settings", Context.MODE_PRIVATE)
+            .edit()
+            .putInt("longPressMillis", 0)
+            .putInt("arrowRepeatIntervalMillis", 5)
+            .putInt("arrowDeadZoneDp", 1000)
+            .commit()
+
+        val pad = storedValues().arrowPad
+        assertThat(pad.pressTimeMillis).isEqualTo(ArrowPadSettings.PressTime.min)
+        assertThat(pad.repeatIntervalMillis).isEqualTo(ArrowPadSettings.RepeatInterval.min)
+        assertThat(pad.deadZoneDp).isEqualTo(ArrowPadSettings.DeadZone.max)
     }
 }

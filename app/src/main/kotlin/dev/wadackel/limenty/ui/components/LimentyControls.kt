@@ -87,6 +87,9 @@ fun SectionHeading(title: String, value: String? = null, modifier: Modifier = Mo
  *
  * The track stops at the thumb rather than running past it to a dot, which is what made the stock
  * appearance hard to read: there was no telling the filled part from the rest.
+ *
+ * [steps] counts the stops between the ends, as Material's does; the arrow keys and the screen
+ * reader then move a stop at a time. Disabled, it is drawn in the faint text colour throughout.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -99,17 +102,20 @@ fun LimentySlider(
     onValueSettled: () -> Unit = {},
     unit: String? = null,
     format: (Float) -> String = { it.roundToInt().toString() },
+    steps: Int = 0,
+    enabled: Boolean = true,
 ) {
+    val mark = if (enabled) LimentyColors.Accent else LimentyColors.Text3
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.Bottom,
         ) {
-            Text(label, style = LimentyText.Body)
+            Text(label, style = LimentyText.Body, color = if (enabled) LimentyColors.Text else LimentyColors.Text3)
             Text(
                 buildAnnotatedString {
-                    withStyle(SpanStyle(fontSize = 15.sp, color = LimentyColors.Text)) {
+                    withStyle(SpanStyle(fontSize = 15.sp, color = if (enabled) LimentyColors.Text else LimentyColors.Text3)) {
                         append(format(value))
                     }
                     if (unit != null) {
@@ -127,13 +133,15 @@ fun LimentySlider(
             onValueChange = onValueChange,
             onValueChangeFinished = onValueSettled,
             valueRange = range,
+            steps = steps,
+            enabled = enabled,
             modifier = Modifier.fillMaxWidth().height(THUMB_HEIGHT),
             thumb = {
                 Box(
                     modifier = Modifier
                         .size(width = THUMB_WIDTH, height = THUMB_HEIGHT)
                         .clip(RoundedCornerShape(2.dp))
-                        .background(LimentyColors.Accent),
+                        .background(mark),
                 )
             },
             track = { state ->
@@ -156,7 +164,7 @@ fun LimentySlider(
                             .fillMaxWidth(fraction.coerceIn(0f, 1f))
                             .height(TRACK_HEIGHT)
                             .clip(RoundedCornerShape(2.dp))
-                            .background(LimentyColors.Accent),
+                            .background(mark),
                     )
                 }
             },

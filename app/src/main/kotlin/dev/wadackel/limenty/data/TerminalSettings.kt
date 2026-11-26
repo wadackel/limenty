@@ -3,6 +3,7 @@ package dev.wadackel.limenty.data
 import android.content.Context
 import dev.wadackel.limenty.core.common.log.LogTags
 import dev.wadackel.limenty.core.common.log.TermLog
+import dev.wadackel.limenty.core.input.ArrowPadSettings
 import dev.wadackel.limenty.core.input.Gesture
 import dev.wadackel.limenty.core.input.GestureBehaviour
 import dev.wadackel.limenty.core.input.GestureBindings
@@ -41,6 +42,7 @@ data class TerminalPreferences(
     val activeKeySet: Int = 0,
     val gestures: GestureBindings = GestureBindings.Initial,
     val doubleTapDragZoom: Boolean = false,
+    val arrowPad: ArrowPadSettings = ArrowPadSettings(),
     val restoreKeyboardOnReturn: Boolean = true,
 ) {
     init {
@@ -223,12 +225,18 @@ class TerminalSettings(context: Context, private val scope: CoroutineScope) {
             activeKeySet = preferences.getInt(KEY_ACTIVE_KEY_SET, defaults.activeKeySet),
             gestures = readGestures() ?: defaults.gestures,
             doubleTapDragZoom = preferences.getBoolean(KEY_DOUBLE_TAP_DRAG, defaults.doubleTapDragZoom),
+            arrowPad = readArrowPad(defaults.arrowPad),
             restoreKeyboardOnReturn = preferences.getBoolean(KEY_RESTORE_KEYBOARD, defaults.restoreKeyboardOnReturn),
         )
     }
 
     private fun write(values: TerminalPreferences) {
+        val pressTime = values.arrowPad.pressTimeMillis
         preferences.edit()
+            .apply { if (pressTime == null) remove(KEY_PRESS_TIME) else putInt(KEY_PRESS_TIME, pressTime) }
+            .putInt(KEY_REPEAT_DELAY, values.arrowPad.repeatDelayMillis)
+            .putInt(KEY_REPEAT_INTERVAL, values.arrowPad.repeatIntervalMillis)
+            .putInt(KEY_DEAD_ZONE, values.arrowPad.deadZoneDp)
             .putString(KEY_FONT, values.typography.fontId)
             .putFloat(KEY_FONT_SIZE, values.typography.fontSizeSp)
             .putFloat(KEY_LINE_HEIGHT, values.typography.lineHeight)
@@ -244,6 +252,18 @@ class TerminalSettings(context: Context, private val scope: CoroutineScope) {
             .putBoolean(KEY_RESTORE_KEYBOARD, values.restoreKeyboardOnReturn)
             .apply()
     }
+
+    /**
+     * Snapped onto the ranges the screen offers, so a value no slider can reach, written by another
+     * version or by hand, cannot leave the pad unusable. Press time is absent rather than a number
+     * while it follows the system.
+     */
+    private fun readArrowPad(defaults: ArrowPadSettings): ArrowPadSettings = ArrowPadSettings(
+        pressTimeMillis = if (preferences.contains(KEY_PRESS_TIME)) preferences.getInt(KEY_PRESS_TIME, 0) else defaults.pressTimeMillis,
+        repeatDelayMillis = preferences.getInt(KEY_REPEAT_DELAY, defaults.repeatDelayMillis),
+        repeatIntervalMillis = preferences.getInt(KEY_REPEAT_INTERVAL, defaults.repeatIntervalMillis),
+        deadZoneDp = preferences.getInt(KEY_DEAD_ZONE, defaults.deadZoneDp),
+    ).snapped()
 
     /**
      * The single bar stored before there were sets, as the set it becomes.
@@ -335,6 +355,10 @@ class TerminalSettings(context: Context, private val scope: CoroutineScope) {
         const val KEY_ACTIVE_KEY_SET = "activeKeySet"
         const val KEY_GESTURES = "gestures"
         const val KEY_DOUBLE_TAP_DRAG = "doubleTapDrag"
+        const val KEY_PRESS_TIME = "longPressMillis"
+        const val KEY_REPEAT_DELAY = "arrowRepeatDelayMillis"
+        const val KEY_REPEAT_INTERVAL = "arrowRepeatIntervalMillis"
+        const val KEY_DEAD_ZONE = "arrowDeadZoneDp"
         const val KEY_RESTORE_KEYBOARD = "restoreKeyboard"
     }
 }

@@ -1,5 +1,6 @@
 package dev.wadackel.limenty.terminal
 
+import dev.wadackel.limenty.core.input.ArrowPadSettings
 import dev.wadackel.limenty.core.input.TerminalKey
 import kotlin.math.abs
 import kotlin.math.max
@@ -12,13 +13,6 @@ import kotlin.math.sqrt
  * threshold that is off by a little only shows up as an arrow nobody meant, on a device.
  */
 object ArrowDropGeometry {
-    /**
-     * Back inside this circle the repeat stops, and the first arrow waits until the press leaves it.
-     * Starting at the touch slop instead would make a press that has just been stopped start again
-     * the moment the thumb drifts.
-     */
-    const val DEAD_ZONE_DP = 25f
-
     /**
      * Near a diagonal the arrow already being sent is kept while its axis carries at least this share
      * of the larger one. Without it a thumb resting on the diagonal flips between two arrows.
@@ -36,7 +30,11 @@ object ArrowDropGeometry {
     const val DOT_DISTANCE_DP = 48f
     const val DOT_RADIUS_DP = 2.5f
 
-    fun deadZone(metrics: TerminalMetrics): Float = DEAD_ZONE_DP * metrics.density
+    /**
+     * Back inside this circle the repeat stops, and the first arrow waits until the press leaves it.
+     * Its size is a setting: [ArrowPadSettings.DeadZone] keeps it inside [DOT_DISTANCE_DP].
+     */
+    fun deadZone(deadZoneDp: Int, metrics: TerminalMetrics): Float = deadZoneDp * metrics.density
 
     /** The arrow for a press that has moved [dx], [dy] from where it landed, or null inside the dead zone. */
     fun aim(dx: Float, dy: Float, current: TerminalKey?, deadZone: Float): TerminalKey? {
