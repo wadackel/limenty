@@ -59,11 +59,13 @@ class OpenSourceNoticesTest {
     }
 
     @Test
-    fun `fonts come first and libraries follow by name`() {
+    fun `fonts come first, then the icons, and libraries follow by name`() {
         val notices = openSourceNotices(definitions) { "font licence" }
 
         assertThat(notices.take(BundledFonts.size).map { it.name }).isEqualTo(BundledFonts.map { it.name })
-        assertThat(notices.drop(BundledFonts.size).map { it.name })
+        assertThat(notices[BundledFonts.size].name).isEqualTo("Lucide")
+        assertThat(notices[BundledFonts.size].detail).isEqualTo("Icons")
+        assertThat(notices.drop(BundledFonts.size + 1).map { it.name })
             .containsExactly("AndroidX Lifecycle", "Bouncy Castle", "Compose UI", "Widget")
             .inOrder()
     }

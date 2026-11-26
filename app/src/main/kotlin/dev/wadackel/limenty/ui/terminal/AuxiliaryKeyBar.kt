@@ -43,6 +43,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -76,6 +77,7 @@ import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -99,6 +101,7 @@ import dev.wadackel.limenty.core.terminal.TerminalFont
 import dev.wadackel.limenty.data.AuxiliaryKey
 import dev.wadackel.limenty.data.KeyBarSlot
 import dev.wadackel.limenty.data.KeyGroup
+import dev.wadackel.limenty.data.KeyIcon
 import dev.wadackel.limenty.data.SlotPosition
 import dev.wadackel.limenty.ui.components.DropInto
 import dev.wadackel.limenty.ui.components.ReorderState
@@ -627,7 +630,7 @@ private fun EditedSlot(slot: KeyBarSlot, at: SlotPosition, editing: KeyBarEditin
         contentAlignment = Alignment.Center,
     ) {
         KeyFace(
-            slot.label,
+            slot.face(),
             face = slotFace(at.pinned),
             ink = slotInk(at.pinned),
             marked = slot is KeyGroup,
@@ -659,7 +662,7 @@ private fun BarKey(key: AuxiliaryKey, pinned: Boolean, input: BarInput, handle: 
             .padding(horizontal = KEY_GAP / 2),
         contentAlignment = Alignment.Center,
     ) {
-        KeyFace(key.label, face = slotFace(pinned), ink = slotInk(pinned))
+        KeyFace(key.face(), face = slotFace(pinned), ink = slotInk(pinned))
     }
 }
 
@@ -728,7 +731,7 @@ private fun GroupSlot(group: KeyGroup, pinned: Boolean, input: BarInput, handle:
         contentAlignment = Alignment.Center,
     ) {
         KeyFace(
-            group.label,
+            group.face(),
             face = if (isOpen) LimentyColors.Surface5 else slotFace(pinned),
             ink = if (isOpen) LimentyColors.Text else slotInk(pinned),
             marked = true,
@@ -870,7 +873,7 @@ private fun KeyGroupLayer(popup: KeyGroupPopupState, placement: BarPlacement, on
                     contentAlignment = Alignment.Center,
                 ) {
                     KeyFace(
-                        member.label,
+                        member.face(),
                         face = if (popup.underFinger == index) LimentyColors.KeyUnderFinger else LimentyColors.Surface4,
                         ink = LimentyColors.Text,
                     )
@@ -887,10 +890,11 @@ private fun KeyGroupLayer(popup: KeyGroupPopupState, placement: BarPlacement, on
  * inside the face, so a group is exactly as wide as a key with the same label.
  */
 @Composable
-private fun KeyFace(label: String, face: Color, ink: Color, marked: Boolean = false, ringed: Boolean = false) {
+private fun KeyFace(parts: List<FacePart>, face: Color, ink: Color, marked: Boolean = false, ringed: Boolean = false) {
     // A one-character label gets a square rather than a letterbox: `|` and `~` in a key shaped for
-    // `PgDn` read as mostly empty, and the four of them together made the run look gappy.
-    val square = label.length == 1
+    // `PgDn` read as mostly empty, and the four of them together made the run look gappy. An icon
+    // is as narrow as one character, so it gets the same square.
+    val square = parts.singleOrNull().let { it is FacePart.Picture || (it is FacePart.Words && it.text.length == 1) }
     Box(
         modifier = Modifier
             // Fixed height, not a floor: with a floor the label's own line box sets the height,
@@ -909,14 +913,86 @@ private fun KeyFace(label: String, face: Color, ink: Color, marked: Boolean = fa
             .then(if (square) Modifier else Modifier.padding(horizontal = LABEL_PADDING)),
         contentAlignment = Alignment.Center,
     ) {
-        Text(
-            text = label,
-            color = ink,
-            style = AuxiliaryKeyBarMetrics.labelStyle(),
-            textAlign = TextAlign.Center,
-            maxLines = 1,
-        )
+        KeyFaceContent(parts, ink)
     }
+}
+
+/**
+ * What a slot's face shows, in order: its label, or an icon in its place.
+ *
+ * More than one part only for a group with no name and no icon, which shows its members' faces side
+ * by side. Labels next to each other are joined into one, so such a group without icons is drawn as
+ * the one line of text it always was.
+ */
+internal sealed interface FacePart {
+    data class Words(val text: String) : FacePart
+
+    data class Picture(val icon: KeyIcon) : FacePart
+}
+
+internal fun KeyBarSlot.face(): List<FacePart> {
+    val own = icon
+    return when {
+        own != null -> listOf(FacePart.Picture(own))
+        this is KeyGroup && name.isBlank() && keys.isNotEmpty() -> keys.flatMap { it.face() }.fold(emptyList()) { joined, part ->
+            val last = joined.lastOrNull()
+            if (last is FacePart.Words && part is FacePart.Words) joined.dropLast(1) + FacePart.Words("${last.text} ${part.text}") else joined + part
+        }
+        else -> listOf(FacePart.Words(label))
+    }
+}
+
+/**
+ * A face's label and icons, drawn the way the bar draws them, for anything that shows a key as the
+ * key it is.
+ *
+ * [ellipsize] is for a face given a width it can run out of: text then ends in an ellipsis rather
+ * than being cut. The bar's own faces leave it off, since they are as wide as what they hold.
+ */
+@Composable
+internal fun KeyFaceContent(parts: List<FacePart>, ink: Color, modifier: Modifier = Modifier, ellipsize: Boolean = false) {
+    val single = parts.singleOrNull()
+    if (single is FacePart.Words) {
+        FaceWords(single.text, ink, modifier, ellipsize)
+        return
+    }
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(FACE_PART_GAP),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        parts.forEach { part ->
+            when (part) {
+                // Weighted only when bounded: a weight in a row with no width limit measures to nothing.
+                is FacePart.Words -> FaceWords(part.text, ink, if (ellipsize) Modifier.weight(1f, fill = false) else Modifier, ellipsize)
+                is FacePart.Picture -> KeyIconImage(part.icon, ink, AuxiliaryKeyBarMetrics.iconSize())
+            }
+        }
+    }
+}
+
+@Composable
+private fun FaceWords(text: String, ink: Color, modifier: Modifier, ellipsize: Boolean) {
+    Text(
+        text = text,
+        color = ink,
+        style = AuxiliaryKeyBarMetrics.labelStyle(),
+        textAlign = if (ellipsize) TextAlign.Unspecified else TextAlign.Center,
+        maxLines = 1,
+        overflow = if (ellipsize) TextOverflow.Ellipsis else TextOverflow.Clip,
+        modifier = modifier,
+    )
+}
+
+/** An icon from the shipped set, in one colour. Says nothing to a screen reader: the slot around it names it. */
+@Composable
+internal fun KeyIconImage(icon: KeyIcon, tint: Color, size: Dp, modifier: Modifier = Modifier) {
+    Icon(
+        painter = painterResource(icon.drawable),
+        contentDescription = null,
+        tint = tint,
+        modifier = modifier.size(size),
+    )
 }
 
 /** The triangle in the bottom right of a face that says it opens a group rather than sends. */
@@ -1050,7 +1126,21 @@ internal object AuxiliaryKeyBarMetrics {
         return remember(assets) { FontFamily(Font(TerminalFont.JetBrainsMono.regularAsset, assets)) }
     }
 
-    /** How wide a key ends up, given what its label measured to in [labelStyle]. */
+    /**
+     * How large an icon is drawn on a face: 15 at the default font scale, and growing with the
+     * system font scale the way a label does, since an icon that stayed small would be the one thing
+     * on the bar that did not. Measured in sp for that reason, and stopped at [iconMaxSize], past
+     * which it would run into the corners of the 32 face.
+     */
+    @Composable
+    fun iconSize(): Dp = with(LocalDensity.current) { 15.sp.toDp() }.coerceAtMost(iconMaxSize)
+
+    val iconMaxSize = 24.dp
+
+    /**
+     * How wide a key drawn as its label ends up, given what the label measured to in [labelStyle].
+     * A key drawn as an icon is [keyHeight] wide, the same square as a one-character label.
+     */
     fun keyWidth(label: String, textWidth: Dp): Dp = if (label.length == 1) keyHeight else maxOf(keyMinWidth, textWidth + labelPadding * 2)
 
     /** What the pinned keys and the gaps between them claim. */
@@ -1082,6 +1172,9 @@ private val POPUP_RISE = AuxiliaryKeyBarMetrics.popupRise
 private val POPUP_RISE_MILLIS = AuxiliaryKeyBarMetrics.popupRiseMillis
 private val POPUP_ELEVATION = 12.dp
 private const val SLIDE_MILLIS = 180
+
+/** Between an icon and the label beside it on one face: about the width of the space it stands for. */
+private val FACE_PART_GAP = 8.dp
 
 /** The least of the bar's right end that takes a carried key to pin, when little or nothing is pinned yet. */
 private val PIN_ZONE_MIN_WIDTH = 88.dp

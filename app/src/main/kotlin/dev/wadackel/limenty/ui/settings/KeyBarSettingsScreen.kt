@@ -67,7 +67,9 @@ import dev.wadackel.limenty.ui.components.reorderable
 import dev.wadackel.limenty.ui.terminal.AuxiliaryKeyBar
 import dev.wadackel.limenty.ui.terminal.AuxiliaryKeyBarMetrics
 import dev.wadackel.limenty.ui.terminal.KeyBarEditing
+import dev.wadackel.limenty.ui.terminal.KeyFaceContent
 import dev.wadackel.limenty.ui.terminal.KeySetSwitcher
+import dev.wadackel.limenty.ui.terminal.face
 import dev.wadackel.limenty.ui.theme.LimentyColors
 import dev.wadackel.limenty.ui.theme.LimentyShapes
 import dev.wadackel.limenty.ui.theme.LimentySpacing
@@ -485,14 +487,7 @@ private fun KeyTile(
         horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            slot.label,
-            color = LimentyColors.Text,
-            style = AuxiliaryKeyBarMetrics.labelStyle(),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f, fill = false),
-        )
+        KeyFaceContent(slot.face(), LimentyColors.Text, Modifier.weight(1f, fill = false), ellipsize = true)
         if (slot is KeyGroup) KeyCount(slot.keys.size)
     }
 }
