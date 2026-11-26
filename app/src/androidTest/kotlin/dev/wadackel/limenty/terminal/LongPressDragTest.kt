@@ -12,6 +12,7 @@ import com.google.common.truth.Truth.assertThat
 import dev.wadackel.limenty.core.common.log.LogRecord
 import dev.wadackel.limenty.core.common.log.LogSink
 import dev.wadackel.limenty.core.common.log.TermLog
+import dev.wadackel.limenty.core.input.ArrowPadSettings
 import dev.wadackel.limenty.core.input.Gesture
 import dev.wadackel.limenty.core.input.GestureBehaviour
 import dev.wadackel.limenty.core.input.GestureBindings
@@ -29,6 +30,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emptyFlow
+import org.junit.Assume.assumeTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.util.concurrent.CopyOnWriteArrayList
@@ -36,9 +38,9 @@ import java.util.concurrent.CopyOnWriteArrayList
 /**
  * A long press held still selects the word under it; a long press that moves sends arrow keys.
  *
- * The long press is a real one: the platform's detector has to have fired it, because the moves
- * that follow are exactly what it drops once it has, and a test that called the helpers directly
- * would never see that.
+ * The long press is a real one: its timer has to have fired on the main looper, which then takes
+ * the platform's gesture detector out of the press, and the moves and the lift that follow are
+ * exactly what that changes. A test that called the helpers directly would never see that.
  */
 @RunWith(AndroidJUnit4::class)
 class LongPressDragTest {
@@ -51,6 +53,7 @@ class LongPressDragTest {
     private fun view(
         text: String = "alpha beta gamma delta epsilon",
         bindings: GestureBindings = GestureBindings.Initial,
+        pad: ArrowPadSettings = ArrowPadSettings(),
     ): TerminalView {
         lateinit var created: TerminalView
         onMain {
@@ -60,6 +63,7 @@ class LongPressDragTest {
             created = TerminalView(context).apply {
                 this.session = session
                 gestures = bindings
+                arrowPad = pad
                 onInputEvents = { sent += it }
                 measure(
                     View.MeasureSpec.makeMeasureSpec(WIDTH, View.MeasureSpec.EXACTLY),
@@ -71,11 +75,19 @@ class LongPressDragTest {
         return created
     }
 
-    /** One finger's gesture, with the second finger available for the cases that need it. */
-    private inner class Touch(private val target: TerminalView, private var x: Float, private var y: Float) {
-        // Back-dated past the long-press timeout, so the detector's delayed message is already due
-        // and runs as soon as the main thread goes idle.
-        private val down = SystemClock.uptimeMillis() - ViewConfiguration.getLongPressTimeout() - LONG_PRESS_MARGIN_MILLIS
+    /**
+     * One finger's gesture, with the second finger available for the cases that need it.
+     *
+     * The press is back-dated by [heldFor], past the system's long-press timeout unless a test says
+     * otherwise, so a long press that is due runs as soon as the main thread goes idle.
+     */
+    private inner class Touch(
+        private val target: TerminalView,
+        private var x: Float,
+        private var y: Float,
+        heldFor: Long = ViewConfiguration.getLongPressTimeout() + LONG_PRESS_MARGIN_MILLIS,
+    ) {
+        private val down = SystemClock.uptimeMillis() - heldFor
         private var time = SystemClock.uptimeMillis()
 
         private fun dispatch(event: MotionEvent) {
@@ -144,6 +156,12 @@ class LongPressDragTest {
         }
 
         fun lift() = dispatch(single(MotionEvent.ACTION_UP))
+    }
+
+    private fun padOpen(target: TerminalView): Boolean {
+        var read = false
+        onMain { read = target.arrowDropOpen }
+        return read
     }
 
     private fun cellCentre(target: TerminalView, line: Int, column: Int): Pair<Float, Float> {
@@ -254,18 +272,13 @@ class LongPressDragTest {
     fun theDropOpensWithTheLongPressAndClosesWhenTheFingerLifts() {
         val target = view()
         val (x, y) = cellCentre(target, 0, 8)
-        fun open(): Boolean {
-            var read = false
-            onMain { read = target.arrowDropOpen }
-            return read
-        }
 
         val touch = Touch(target, x, y).press()
-        val whileHeld = open()
+        val whileHeld = padOpen(target)
         touch.lift()
 
         assertThat(whileHeld).isTrue()
-        assertThat(open()).isFalse()
+        assertThat(padOpen(target)).isFalse()
     }
 
     @Test
@@ -303,6 +316,38 @@ class LongPressDragTest {
 
         assertThat(sent).isEmpty()
         assertThat(target.selection).isNull()
+    }
+
+    /** The platform's long press ended at a second finger too, and the swipe that followed still counted. */
+    @Test
+    fun aSecondFingerAfterALongPressHandsTheFingersBackToTheirSwipes() {
+        val enter = GestureBehaviour.SendKeys(listOf(KeyStep.Press(key = TerminalKey.Enter)))
+        val target = view(bindings = GestureBindings.Initial.with(Gesture.TwoFingerSwipeRight, enter))
+        val (x, y) = cellCentre(target, 2, 4)
+
+        Touch(target, x, y).press().secondFingerDrag(gap = WIDTH / 3f, dx = target.metrics.cellWidth * 4).lift()
+
+        assertThat(keys()).containsExactly(TerminalKey.Enter)
+    }
+
+    /** The shortest press time is inside a two-finger tap's window, and one touch must not do both. */
+    @Test
+    fun aTwoFingerTapThatOutlastsAShortPressTimeIsOnlyTheLongPress() {
+        val tab = GestureBehaviour.SendKeys(listOf(KeyStep.Press(key = TerminalKey.Tab)))
+        val short = ArrowPadSettings.PressTime.min.toLong()
+        val target = view(
+            bindings = GestureBindings.Initial.with(Gesture.TwoFingerTap, tab),
+            pad = ArrowPadSettings(pressTimeMillis = short.toInt()),
+        )
+        val (x, y) = cellCentre(target, 0, 8)
+
+        // Held for real rather than back-dated, so the down's own time and the tap's window agree.
+        val touch = Touch(target, x, y, heldFor = 0).press().hold(short + SHORT_PRESS_MARGIN_MILLIS / 2)
+        val opened = padOpen(target)
+        touch.secondFingerDrag(gap = WIDTH / 3f, dx = 0f, steps = 1).lift()
+
+        assertThat(opened).isTrue()
+        assertThat(sent).isEmpty()
     }
 
     @Test
@@ -352,6 +397,115 @@ class LongPressDragTest {
         }
     }
 
+    @Test
+    fun aPressTimeLongerThanTheSystemsKeepsThePadClosedUntilItHasPassed() {
+        val target = view(pad = ArrowPadSettings(pressTimeMillis = ArrowPadSettings.PressTime.max))
+        val (x, y) = cellCentre(target, 0, 8)
+
+        val touch = Touch(target, x, y).press()
+        val atTheSystemsTime = padOpen(target)
+        touch.hold(ArrowPadSettings.PressTime.max.toLong())
+        val atTheSetTime = padOpen(target)
+        touch.lift()
+
+        assertThat(atTheSystemsTime).isFalse()
+        assertThat(atTheSetTime).isTrue()
+    }
+
+    @Test
+    fun aPressTimeShorterThanTheSystemsOpensThePadBeforeTheSystemWould() {
+        val short = ArrowPadSettings.PressTime.min.toLong()
+        val heldFor = short + SHORT_PRESS_MARGIN_MILLIS
+        assumeTrue(ViewConfiguration.getLongPressTimeout() > heldFor)
+        val target = view(pad = ArrowPadSettings(pressTimeMillis = short.toInt()))
+        val (x, y) = cellCentre(target, 0, 8)
+
+        val touch = Touch(target, x, y, heldFor = heldFor).press()
+        val open = padOpen(target)
+        touch.lift()
+
+        assertThat(open).isTrue()
+        assertThat(target.selectedText()).isEqualTo("beta")
+    }
+
+    /** Set on a view that already exists, as a change in settings reaches a session already open. */
+    @Test
+    fun aPressTimeChangedOnAnOpenViewTimesTheNextPress() {
+        val target = view()
+        onMain { target.arrowPad = ArrowPadSettings(pressTimeMillis = ArrowPadSettings.PressTime.max) }
+        val (x, y) = cellCentre(target, 0, 8)
+
+        val touch = Touch(target, x, y).press()
+        val open = padOpen(target)
+        touch.lift()
+
+        assertThat(open).isFalse()
+    }
+
+    @Test
+    fun aPressTimeAlsoTimesALongPressBoundToSomethingElse() {
+        val keys = GestureBehaviour.SendKeys(listOf(KeyStep.Press(key = TerminalKey.Enter)))
+        val target = view(
+            bindings = GestureBindings.Initial.with(Gesture.LongPress, keys),
+            pad = ArrowPadSettings(pressTimeMillis = ArrowPadSettings.PressTime.max),
+        )
+        val (x, y) = cellCentre(target, 0, 8)
+
+        Touch(target, x, y).press().lift()
+        val early = keys().size
+        Touch(target, x, y, heldFor = ArrowPadSettings.PressTime.max + LONG_PRESS_MARGIN_MILLIS).press().lift()
+
+        assertThat(early).isEqualTo(0)
+        assertThat(keys()).containsExactly(TerminalKey.Enter)
+    }
+
+    @Test
+    fun aShorterRepeatDelayAndIntervalSendMoreArrowsForTheSameHold() {
+        val target = view(pad = ArrowPadSettings(repeatDelayMillis = ArrowPadSettings.RepeatDelay.min, repeatIntervalMillis = 50))
+        val (x, y) = cellCentre(target, 0, 8)
+
+        val touch = Touch(target, x, y).press().moveBy(drag(target))
+        val beforeHold = keys().size
+        touch.hold(REPEAT_HOLD_MILLIS)
+        val afterHold = keys().size
+        touch.lift()
+
+        // The default timing sends four at most in this hold; this one has time for eighteen.
+        assertThat(beforeHold).isEqualTo(1)
+        assertThat(afterHold - beforeHold).isAtLeast(10)
+    }
+
+    @Test
+    fun aRepeatDelayLongerThanTheHoldSendsOnlyTheFirstArrow() {
+        val target = view(pad = ArrowPadSettings(repeatDelayMillis = ArrowPadSettings.RepeatDelay.max))
+        val (x, y) = cellCentre(target, 0, 8)
+
+        Touch(target, x, y).press().moveBy(drag(target)).hold(SHORT_HOLD_MILLIS).lift()
+
+        assertThat(keys()).containsExactly(TerminalKey.ArrowRight)
+    }
+
+    @Test
+    fun aWiderDeadZoneHoldsBackADragTheDefaultWouldSend() {
+        val target = view(pad = ArrowPadSettings(deadZoneDp = ArrowPadSettings.DeadZone.max))
+        val (x, y) = cellCentre(target, 0, 8)
+
+        Touch(target, x, y).press().moveBy(drag(target)).lift()
+
+        assertThat(sent).isEmpty()
+        assertThat(target.selectedText()).isEqualTo("beta")
+    }
+
+    @Test
+    fun aNarrowerDeadZoneSendsAnArrowForAWobbleTheDefaultIgnores() {
+        val target = view(pad = ArrowPadSettings(deadZoneDp = ArrowPadSettings.DeadZone.min))
+        val (x, y) = cellCentre(target, 0, 8)
+
+        Touch(target, x, y).press().moveBy(WOBBLE_DP * target.metrics.density).lift()
+
+        assertThat(keys()).containsExactly(TerminalKey.ArrowRight)
+    }
+
     private fun offlineSession(): TerminalSession = TerminalSession(
         id = SessionId("long-press-drag-test"),
         hostId = "test",
@@ -377,12 +531,19 @@ class LongPressDragTest {
         const val FRAME_MILLIS = 16L
         const val LONG_PRESS_MARGIN_MILLIS = 200L
 
-        // Either side of ArrowDropGeometry.DEAD_ZONE_DP, with room for the steps a drag is cut into.
+        // Past the shortest press time and still short of the system's default of 400ms.
+        const val SHORT_PRESS_MARGIN_MILLIS = 50L
+
+        // Either side of the default dead zone, with room for the steps a drag is cut into, and
+        // inside the widest one and outside the narrowest.
         const val DRAG_DP = 40f
         const val WOBBLE_DP = 15f
 
         // Past the repeat delay and a few intervals, so a working repeat has certainly fired.
         const val REPEAT_HOLD_MILLIS = 1000L
         const val AFTER_LIFT_MILLIS = 300L
+
+        // Well short of the longest repeat delay.
+        const val SHORT_HOLD_MILLIS = 600L
     }
 }

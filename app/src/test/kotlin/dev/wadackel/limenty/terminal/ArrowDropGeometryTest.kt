@@ -1,6 +1,7 @@
 package dev.wadackel.limenty.terminal
 
 import com.google.common.truth.Truth.assertThat
+import dev.wadackel.limenty.core.input.ArrowPadSettings
 import dev.wadackel.limenty.core.input.TerminalKey
 import org.junit.Test
 
@@ -13,7 +14,8 @@ class ArrowDropGeometryTest {
         letterSpacingPx = 0f,
         density = 3f,
     )
-    private val deadZone = ArrowDropGeometry.deadZone(metrics)
+    private val deadZoneDp = ArrowPadSettings().deadZoneDp
+    private val deadZone = ArrowDropGeometry.deadZone(deadZoneDp, metrics)
 
     private fun aim(dx: Float, dy: Float, current: TerminalKey? = null) = ArrowDropGeometry.aim(dx, dy, current, deadZone)
 
@@ -62,10 +64,24 @@ class ArrowDropGeometryTest {
         val longest = ArrowDropGeometry.MAX_REACH_DP * density
 
         assertThat(ArrowDropGeometry.headDistance(deadZone, 0f, TerminalKey.ArrowRight, metrics)).isEqualTo(
-            (ArrowDropGeometry.DEAD_ZONE_DP + ArrowDropGeometry.HEAD_LEAD_DP) * density,
+            (deadZoneDp + ArrowDropGeometry.HEAD_LEAD_DP) * density,
         )
         assertThat(ArrowDropGeometry.headDistance(0f, 0f, TerminalKey.ArrowUp, metrics)).isEqualTo(shortest)
         assertThat(ArrowDropGeometry.headDistance(0f, -1000f, TerminalKey.ArrowUp, metrics)).isEqualTo(longest)
+    }
+
+    /** The dots that mark the four directions are drawn here; a dead zone past them would cover one. */
+    @Test
+    fun `the largest dead zone the settings offer stays inside the direction dots`() {
+        assertThat(ArrowPadSettings.DeadZone.max.toFloat()).isLessThan(ArrowDropGeometry.DOT_DISTANCE_DP)
+    }
+
+    @Test
+    fun `a larger dead zone holds back a press the default would already aim`() {
+        val wide = ArrowDropGeometry.deadZone(ArrowPadSettings.DeadZone.max, metrics)
+
+        assertThat(aim(deadZone + 1f, 0f)).isEqualTo(TerminalKey.ArrowRight)
+        assertThat(ArrowDropGeometry.aim(deadZone + 1f, 0f, null, wide)).isNull()
     }
 
     @Test

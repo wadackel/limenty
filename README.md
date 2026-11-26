@@ -43,7 +43,9 @@ icons.
 - **Keys that send more than one key.** A single button can send `Ctrl-b` then `c`, or type
   `git status`, under whatever label you give it, or as one of 65 icons so more keys fit on the
   bar.
-- **A drag arrow pad.** Long-press and slide to send repeating arrow keys in that direction.
+- **A drag arrow pad.** Long-press and slide to send repeating arrow keys in that direction. How
+  long the press takes, when the repeat starts, how fast it runs and how far the thumb has to move
+  are set under Gestures.
 - **Gestures you choose.** Fourteen gestures, from double tap to two-finger swipes and pinch,
   each bound to an action: show the keyboard, paste, scroll, zoom the font, or send a key.
 

@@ -148,6 +148,10 @@ fun TerminalScreen(
         terminalView?.doubleTapDragZoom = preferences.doubleTapDragZoom
     }
 
+    LaunchedEffect(preferences.arrowPad, terminalView) {
+        terminalView?.arrowPad = preferences.arrowPad
+    }
+
     // Keyed on the palette's colours rather than its id: editing a custom theme changes the colours
     // and keeps the id, and the open session has to repaint as each one changes.
     LaunchedEffect(preferences.typography, preferences.palette, terminalView) {
@@ -191,6 +195,7 @@ fun TerminalScreen(
                             onInputEvents = { events -> pipeline.send(events) }
                             gestures = preferences.gestures
                             doubleTapDragZoom = preferences.doubleTapDragZoom
+                            arrowPad = preferences.arrowPad
                             onMouseReport = { bytes -> session.send(bytes) }
                             onGestureBehaviour = { behaviour ->
                                 when (behaviour) {

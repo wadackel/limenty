@@ -7,6 +7,7 @@ import android.graphics.PointF
 import android.graphics.Typeface
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.view.GestureDetector
 import android.view.HapticFeedbackConstants
 import android.view.KeyEvent
@@ -17,6 +18,7 @@ import android.view.inputmethod.InputMethodManager
 import android.widget.Magnifier
 import dev.wadackel.limenty.core.common.log.LogTags
 import dev.wadackel.limenty.core.common.log.TermLog
+import dev.wadackel.limenty.core.input.ArrowPadSettings
 import dev.wadackel.limenty.core.input.Gesture
 import dev.wadackel.limenty.core.input.GestureBehaviour
 import dev.wadackel.limenty.core.input.GestureBindings
@@ -117,6 +119,9 @@ class TerminalView(context: Context) : TerminalInputView(context) {
     private var reportedBounds: SelectionBounds? = null
 
     var gestures: GestureBindings = GestureBindings.Initial
+
+    /** Read at each press and each repeat, so a change reaches a session that is already open. */
+    var arrowPad: ArrowPadSettings = ArrowPadSettings()
 
     /** Whether a double tap held and dragged up or down counts as a pinch. */
     var doubleTapDragZoom: Boolean
@@ -329,6 +334,10 @@ class TerminalView(context: Context) : TerminalInputView(context) {
         isQuickScaleEnabled = false
     }
 
+    // Not the view's own postDelayed: a view outside a window queues those until it is attached,
+    // so the repeat and the long press would never run for a view driven without one.
+    private val repeatHandler = Handler(Looper.getMainLooper())
+
     private val gestureDetector = GestureDetector(
         context,
         object : GestureDetector.SimpleOnGestureListener() {
@@ -350,6 +359,9 @@ class TerminalView(context: Context) : TerminalInputView(context) {
                 distanceX: Float,
                 distanceY: Float,
             ): Boolean {
+                // A scroll means the finger has left the press, by the detector's reckoning too: an
+                // accessibility gesture it scrolls at once would otherwise still open the pad after.
+                longPress.cancel()
                 // A drag on a selection handle adjusts the selection, whatever the swipe is bound
                 // to: the handle is under the finger, and scrolling out from under it would make
                 // the selection impossible to finish.
@@ -385,29 +397,47 @@ class TerminalView(context: Context) : TerminalInputView(context) {
                     }
                 }
             }
-
-            override fun onLongPress(event: MotionEvent) {
-                // A handle held still is a slow drag about to start, not a new selection. The
-                // detector drops every move after a long press, so the drag is picked up in
-                // onTouchEvent instead.
-                if (handleGrabbed) {
-                    handleHeld = true
-                    return
-                }
-                if (gestures[Gesture.LongPress] !is GestureBehaviour.SelectText) {
-                    perform(Gesture.LongPress, event)
-                    return
-                }
-                // Whether this selects or moves the cursor is not known until the finger lifts or
-                // moves; showing the selection now and withdrawing it on a move would flicker.
-                gestureLog.d("gesture", "gesture" to Gesture.LongPress.name, "behaviour" to "held")
-                heldPress = PointF(event.x, event.y)
-                performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
-                arrowDrop.open(event.x, event.y)
-                invalidate()
-            }
         },
-    )
+    ).apply {
+        // Timed by [longPress] instead, which can be given a time other than the system's.
+        setIsLongpressEnabled(false)
+    }
+
+    /** Set once the long press has fired, until the next press. */
+    private var longPressFired = false
+
+    /** Whether the detector is kept out of the press, from the long press until a second finger lands. */
+    private var detectorOut = false
+
+    private val longPress = LongPressTimer(context, repeatHandler) { down -> longPressed(down) }
+
+    private fun longPressed(down: MotionEvent) {
+        longPressFired = true
+        detectorOut = true
+        gestureLog.d("longpress", "afterMillis" to SystemClock.uptimeMillis() - down.downTime)
+        // The detector would otherwise take the lift for a tap, and the moves after it for a scroll,
+        // which its own long press used to stop it doing.
+        val cancel = MotionEvent.obtain(down).apply { action = MotionEvent.ACTION_CANCEL }
+        gestureDetector.onTouchEvent(cancel)
+        cancel.recycle()
+        // A handle held still is a slow drag about to start, not a new selection. The drag is
+        // picked up in onTouchEvent, which the detector no longer sees.
+        if (handleGrabbed) {
+            handleHeld = true
+            return
+        }
+        if (gestures[Gesture.LongPress] !is GestureBehaviour.SelectText) {
+            perform(Gesture.LongPress, down)
+            return
+        }
+        // Whether this selects or moves the cursor is not known until the finger lifts or
+        // moves; showing the selection now and withdrawing it on a move would flicker.
+        gestureLog.d("gesture", "gesture" to Gesture.LongPress.name, "behaviour" to "held")
+        heldPress = PointF(down.x, down.y)
+        performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+        arrowDrop.open(down.x, down.y)
+        invalidate()
+    }
 
     /** True once a discrete behaviour has fired for the current drag. */
     private var dragBehaviourFired = false
@@ -438,14 +468,10 @@ class TerminalView(context: Context) : TerminalInputView(context) {
     /** Set when a long press fires on a grabbed handle, whose drag the detector then drops. */
     private var handleHeld = false
 
-    // Not the view's own postDelayed: a view outside a window queues those until it is attached,
-    // so the repeat would never run for a view driven without one.
-    private val repeatHandler = Handler(Looper.getMainLooper())
-
     private val arrowRepeat = object : Runnable {
         override fun run() {
             sendArrow()
-            repeatHandler.postDelayed(this, ARROW_REPEAT_INTERVAL_MILLIS)
+            repeatHandler.postDelayed(this, arrowPad.repeatIntervalMillis.toLong())
         }
     }
 
@@ -468,13 +494,13 @@ class TerminalView(context: Context) : TerminalInputView(context) {
         val origin = heldPress ?: return
         val dx = event.x - origin.x
         val dy = event.y - origin.y
-        val next = ArrowDropGeometry.aim(dx, dy, arrowKey, ArrowDropGeometry.deadZone(metrics))
+        val next = ArrowDropGeometry.aim(dx, dy, arrowKey, ArrowDropGeometry.deadZone(arrowPad.deadZoneDp, metrics))
         if (next != arrowKey) {
             repeatHandler.removeCallbacks(arrowRepeat)
             arrowKey = next
             if (next != null) {
                 sendArrow()
-                repeatHandler.postDelayed(arrowRepeat, ARROW_REPEAT_DELAY_MILLIS)
+                repeatHandler.postDelayed(arrowRepeat, arrowPad.repeatDelayMillis.toLong())
             }
         }
         arrowDrop.aimAt(dx, dy, next, metrics)
@@ -515,7 +541,9 @@ class TerminalView(context: Context) : TerminalInputView(context) {
             MotionEvent.ACTION_POINTER_DOWN -> if (event.pointerCount == 2) sawSecondPointer = true
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                 val quick = event.eventTime - twoFingerDownAt < TWO_FINGER_TAP_TIMEOUT_MILLIS
-                if (sawSecondPointer && quick && !scaleDetector.isInProgress && !dragBehaviourFired) {
+                // A press time shorter than the tap's window, or a deep press, can fire the long
+                // press first, and one touch would then do both.
+                if (sawSecondPointer && quick && !scaleDetector.isInProgress && !dragBehaviourFired && !longPressFired) {
                     perform(Gesture.TwoFingerTap, event)
                 }
                 sawSecondPointer = false
@@ -551,6 +579,7 @@ class TerminalView(context: Context) : TerminalInputView(context) {
     override fun onDetachedFromWindow() {
         super.onDetachedFromWindow()
         removeCallbacks(blinkTick)
+        longPress.cancel()
         releaseHeldPress()
         arrowDrop.close(animate = false)
         dismissMagnifier()
@@ -851,6 +880,7 @@ class TerminalView(context: Context) : TerminalInputView(context) {
             if (handled) {
                 // The lift of a press that started before the remote enabled mouse tracking lands
                 // here, and would otherwise leave its arrow repeating.
+                longPress.cancel()
                 releaseHeldPress()
                 requestFocus()
                 return true
@@ -867,6 +897,7 @@ class TerminalView(context: Context) : TerminalInputView(context) {
             // pinch starts a text selection underneath the zoom.
             if (!pinchActive) {
                 pinchActive = true
+                longPress.cancel()
                 releaseHeldPress()
                 releaseHandle()
                 val cancel = MotionEvent.obtain(event).apply { action = MotionEvent.ACTION_CANCEL }
@@ -882,8 +913,15 @@ class TerminalView(context: Context) : TerminalInputView(context) {
         }
         // A second finger ends the long press as far as the detector is concerned; without this
         // the lift that follows would still select the word under the first one.
-        if (event.actionMasked == MotionEvent.ACTION_POINTER_DOWN) releaseHeldPress()
+        if (event.actionMasked == MotionEvent.ACTION_POINTER_DOWN) {
+            longPress.cancel()
+            releaseHeldPress()
+            // The detector's own long press ended here as well, and the fingers went back to
+            // scrolling and two-finger swipes.
+            detectorOut = false
+        }
         if (event.actionMasked == MotionEvent.ACTION_MOVE) {
+            if (longPress.move(event)) return true
             if (handleHeld) {
                 extendSelection(event)
                 autoScrollForSelection(event)
@@ -895,6 +933,9 @@ class TerminalView(context: Context) : TerminalInputView(context) {
             }
         }
         if (event.actionMasked == MotionEvent.ACTION_DOWN) {
+            longPressFired = false
+            detectorOut = false
+            longPress.start(event, (arrowPad.pressTimeMillis ?: ViewConfiguration.getLongPressTimeout()).toLong())
             releaseHeldPress()
             scrollRemainder = 0f
             dragBehaviourFired = false
@@ -912,6 +953,7 @@ class TerminalView(context: Context) : TerminalInputView(context) {
             }
         }
         if (event.actionMasked == MotionEvent.ACTION_UP || event.actionMasked == MotionEvent.ACTION_CANCEL) {
+            longPress.cancel()
             releaseHeldPress()
             // The anchor is released on lift so the next drag scrolls again, while the selection
             // itself stays on screen for the toolbar to act on. Not releaseHandle(): the tap that
@@ -921,6 +963,7 @@ class TerminalView(context: Context) : TerminalInputView(context) {
             grabOffsetY = 0f
             dismissMagnifier()
         }
+        if (detectorOut) return true
         return gestureDetector.onTouchEvent(event) || super.onTouchEvent(event)
     }
 
@@ -1006,11 +1049,6 @@ class TerminalView(context: Context) : TerminalInputView(context) {
 
         /** Long enough for two fingers to land and lift, short enough not to catch a drag. */
         const val TWO_FINGER_TAP_TIMEOUT_MILLIS = 300L
-
-        // Shaped like a held hardware key: the pause lets a single step be taken on purpose,
-        // the interval is slow enough to stop on the intended cell.
-        const val ARROW_REPEAT_DELAY_MILLIS = 400L
-        const val ARROW_REPEAT_INTERVAL_MILLIS = 220L
 
         // Reciprocals, so a pinch in and a pinch out need the same change: well past the drift of
         // two resting fingers, well short of a deliberate pinch.

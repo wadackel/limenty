@@ -19,6 +19,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import dev.wadackel.limenty.core.input.ArrowPadSettings
 import dev.wadackel.limenty.core.input.Gesture
 import dev.wadackel.limenty.core.input.GestureBehaviour
 import dev.wadackel.limenty.core.input.GestureBindings
@@ -60,6 +61,8 @@ class GestureCustomKeysTest {
                         onChange = { bindings = it },
                         doubleTapDragZoom = false,
                         onDoubleTapDragZoomChange = {},
+                        arrowPad = ArrowPadSettings(),
+                        onArrowPadChange = {},
                     )
                 }
             }

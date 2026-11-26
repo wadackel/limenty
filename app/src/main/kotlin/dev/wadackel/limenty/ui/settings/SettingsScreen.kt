@@ -276,6 +276,10 @@ private fun SettingsContent.Page(
                 onChange = { bindings -> onChange { it.copy(gestures = bindings) } },
                 doubleTapDragZoom = preferences.doubleTapDragZoom,
                 onDoubleTapDragZoomChange = { enabled -> onChange { it.copy(doubleTapDragZoom = enabled) } },
+                arrowPad = preferences.arrowPad,
+                onArrowPadChange = { pad -> onChange { it.copy(arrowPad = pad) } },
+                onArrowPadDrag = { pad -> onDrag { it.copy(arrowPad = pad) } },
+                onArrowPadSettled = onSettled,
                 sideBySide = gesturesSideBySide,
             )
             SettingsSection.Screen -> SettingsGroup(modifier = Modifier.padding(top = 8.dp)) { KeepAwakeRow() }

@@ -1,5 +1,6 @@
 package dev.wadackel.limenty.ui.settings
 
+import android.view.ViewConfiguration
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -9,12 +10,14 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -27,19 +30,25 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.LifecycleResumeEffect
+import dev.wadackel.limenty.core.input.ArrowPadSettings
 import dev.wadackel.limenty.core.input.Gesture
 import dev.wadackel.limenty.core.input.GestureBehaviour
 import dev.wadackel.limenty.core.input.GestureBindings
 import dev.wadackel.limenty.core.input.KeyStep
+import dev.wadackel.limenty.core.input.SettingRange
 import dev.wadackel.limenty.data.AuxiliaryKey
 import dev.wadackel.limenty.ui.components.LimentyChevron
 import dev.wadackel.limenty.ui.components.LimentyDialog
 import dev.wadackel.limenty.ui.components.LimentyDialogActions
+import dev.wadackel.limenty.ui.components.LimentySlider
 import dev.wadackel.limenty.ui.components.LimentyTextButton
+import dev.wadackel.limenty.ui.components.LimentyTextButtonInset
 import dev.wadackel.limenty.ui.components.SwitchRow
 import dev.wadackel.limenty.ui.theme.LimentyColors
 import dev.wadackel.limenty.ui.theme.LimentyShapes
 import dev.wadackel.limenty.ui.theme.LimentyText
+import kotlin.math.roundToInt
 
 /** Gestures that take the same hand, under one heading, each with the name it has under it. */
 internal data class GestureGroup(val title: String, val gestures: List<Pair<Gesture, String>>)
@@ -88,6 +97,10 @@ internal val GestureGroups: List<GestureGroup> = listOf(
  * [sideBySide] puts one finger in a column of its own and the rest beside it, which is where the
  * unfolded display's pane has the room; one column there leaves half the pane empty beside a list
  * that runs off its bottom.
+ *
+ * The arrow pad's timing sits under one finger, beside the Long press that opens it, the way the
+ * pinch alternative sits under the pinches. A slider reports through [onArrowPadDrag] while it
+ * moves and [onArrowPadSettled] when it lets go, like the font size's.
  */
 @Composable
 fun GestureSettings(
@@ -95,8 +108,21 @@ fun GestureSettings(
     onChange: (GestureBindings) -> Unit,
     doubleTapDragZoom: Boolean,
     onDoubleTapDragZoomChange: (Boolean) -> Unit,
+    arrowPad: ArrowPadSettings,
+    onArrowPadChange: (ArrowPadSettings) -> Unit,
+    onArrowPadDrag: (ArrowPadSettings) -> Unit = onArrowPadChange,
+    onArrowPadSettled: () -> Unit = {},
     sideBySide: Boolean = false,
 ) {
+    val arrowPadSection = @Composable {
+        ArrowPad(
+            settings = arrowPad,
+            padOpens = bindings[Gesture.LongPress] is GestureBehaviour.SelectText,
+            onChange = onArrowPadChange,
+            onDrag = onArrowPadDrag,
+            onSettled = onArrowPadSettled,
+        )
+    }
     var editing by remember { mutableStateOf<Gesture?>(null) }
     var composing by remember { mutableStateOf<Gesture?>(null) }
     val (first, rest) = GestureGroups.first() to GestureGroups.drop(1)
@@ -109,7 +135,10 @@ fun GestureSettings(
         ) {
             // The row carries the margin, so the groups inside it start on its edges.
             CompositionLocalProvider(LocalSettingsFrame provides frame.copy(margin = 0.dp)) {
-                Column(modifier = Modifier.weight(1f)) { Group(first, bindings) { editing = it } }
+                Column(modifier = Modifier.weight(1f)) {
+                    Group(first, bindings) { editing = it }
+                    arrowPadSection()
+                }
                 Column(modifier = Modifier.weight(1f)) {
                     rest.forEach { group -> Group(group, bindings) { editing = it } }
                     PinchAlternative(doubleTapDragZoom, onDoubleTapDragZoomChange)
@@ -117,7 +146,9 @@ fun GestureSettings(
             }
         }
     } else {
-        GestureGroups.forEach { group -> Group(group, bindings) { editing = it } }
+        Group(first, bindings) { editing = it }
+        arrowPadSection()
+        rest.forEach { group -> Group(group, bindings) { editing = it } }
         PinchAlternative(doubleTapDragZoom, onDoubleTapDragZoomChange)
     }
 
@@ -312,4 +343,131 @@ private fun PinchAlternative(enabled: Boolean, onChange: (Boolean) -> Unit) {
         color = LimentyColors.Text3,
         modifier = Modifier.padding(start = margin, end = margin, top = 8.dp),
     )
+}
+
+/**
+ * The drag arrow pad's timing, and Long press's with it.
+ *
+ * Press time follows Android's Touch & hold delay until a time is set: the switch goes back to it,
+ * and moving the slider leaves it. It stays editable whatever Long press is bound to, since it
+ * times that too; the rest only mean something while Long press opens the pad.
+ */
+@Composable
+private fun ArrowPad(
+    settings: ArrowPadSettings,
+    padOpens: Boolean,
+    onChange: (ArrowPadSettings) -> Unit,
+    onDrag: (ArrowPadSettings) -> Unit,
+    onSettled: () -> Unit,
+) {
+    val systemPressTime = rememberSystemPressTime()
+    val followsSystem = settings.pressTimeMillis == null
+    SettingsHeading("Arrow pad")
+    SettingsGroup {
+        Column(modifier = Modifier.padding(top = 16.dp)) {
+            RangeSlider(
+                label = "Press time",
+                value = settings.pressTimeMillis ?: systemPressTime,
+                range = ArrowPadSettings.PressTime,
+                unit = if (followsSystem) null else "ms",
+                format = { if (followsSystem) "System (${systemPressTime}ms)" else "$it" },
+                onValueChange = { onDrag(settings.copy(pressTimeMillis = it)) },
+                onSettled = onSettled,
+            )
+        }
+        SwitchRow(
+            label = "Follow the system",
+            description = "Android's Touch & hold delay. Times every long press on the terminal.",
+            checked = followsSystem,
+            onCheckedChange = { follow ->
+                onChange(settings.copy(pressTimeMillis = if (follow) null else ArrowPadSettings.PressTime.snap(systemPressTime)))
+            },
+        )
+        Column(modifier = Modifier.padding(top = 8.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
+            RangeSlider(
+                label = "Delay before repeat",
+                value = settings.repeatDelayMillis,
+                range = ArrowPadSettings.RepeatDelay,
+                unit = "ms",
+                enabled = padOpens,
+                onValueChange = { onDrag(settings.copy(repeatDelayMillis = it)) },
+                onSettled = onSettled,
+            )
+            RangeSlider(
+                label = "Repeat interval",
+                value = settings.repeatIntervalMillis,
+                range = ArrowPadSettings.RepeatInterval,
+                unit = "ms",
+                enabled = padOpens,
+                onValueChange = { onDrag(settings.copy(repeatIntervalMillis = it)) },
+                onSettled = onSettled,
+            )
+            RangeSlider(
+                label = "Dead zone",
+                value = settings.deadZoneDp,
+                range = ArrowPadSettings.DeadZone,
+                unit = "dp",
+                enabled = padOpens,
+                onValueChange = { onDrag(settings.copy(deadZoneDp = it)) },
+                onSettled = onSettled,
+            )
+        }
+    }
+    val margin = LocalSettingsFrame.current.margin + GROUP_TEXT_INSET
+    Text(
+        if (padOpens) {
+            "While Long press is Select text, hold the terminal, then slide to send arrow keys."
+        } else {
+            "Delay before repeat, repeat interval and dead zone apply when Long press is Select text."
+        },
+        style = LimentyText.Secondary,
+        color = LimentyColors.Text3,
+        modifier = Modifier.padding(start = margin, end = margin, top = 8.dp),
+    )
+    // Hung out by the button's own inset, so its word lines up with the note above it.
+    LimentyTextButton(
+        label = "Reset to defaults",
+        onClick = { onChange(ArrowPadSettings()) },
+        enabled = !settings.isDefault,
+        modifier = Modifier.padding(start = margin, top = 4.dp).offset(x = -LimentyTextButtonInset),
+    )
+}
+
+/** A [LimentySlider] over whole numbers on [range]'s steps. */
+@Composable
+private fun RangeSlider(
+    label: String,
+    value: Int,
+    range: SettingRange,
+    unit: String?,
+    onValueChange: (Int) -> Unit,
+    onSettled: () -> Unit,
+    enabled: Boolean = true,
+    format: (Int) -> String = { it.toString() },
+) {
+    LimentySlider(
+        label = label,
+        value = range.snap(value).toFloat(),
+        range = range.min.toFloat()..range.max.toFloat(),
+        steps = range.stopsBetween,
+        enabled = enabled,
+        unit = unit,
+        format = { format(it.roundToInt()) },
+        onValueChange = { onValueChange(range.snap(it.roundToInt())) },
+        onValueSettled = onSettled,
+    )
+}
+
+/**
+ * Android's Touch & hold delay, read again each time the screen comes back: it is changed in the
+ * system's settings, which this screen is left for.
+ */
+@Composable
+private fun rememberSystemPressTime(): Int {
+    var millis by remember { mutableIntStateOf(ViewConfiguration.getLongPressTimeout()) }
+    LifecycleResumeEffect(Unit) {
+        millis = ViewConfiguration.getLongPressTimeout()
+        onPauseOrDispose { }
+    }
+    return millis
 }
