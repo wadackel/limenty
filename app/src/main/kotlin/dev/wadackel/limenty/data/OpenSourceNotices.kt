@@ -51,19 +51,25 @@ internal fun reflowLicense(text: String): String {
     return out.toString().trim()
 }
 
-/** A font in the APK's assets, with the licence file shipped beside it. */
-internal data class BundledFont(val name: String, val license: String, val asset: String)
+/** A font or an icon set shipped in the APK, with the licence file shipped beside it in its assets. */
+internal data class BundledAsset(val name: String, val license: String, val asset: String)
 
 internal val BundledFonts = listOf(
-    BundledFont("JetBrains Mono", "OFL-1.1", "licenses/JetBrainsMono-OFL.txt"),
-    BundledFont("Fira Code", "OFL-1.1", "licenses/FiraCode-OFL.txt"),
-    BundledFont("Hack", "MIT + Bitstream Vera", "licenses/Hack-LICENSE.md"),
-    BundledFont("Source Code Pro", "OFL-1.1", "licenses/SourceCodePro-OFL.md"),
-    BundledFont("IBM Plex Mono", "OFL-1.1", "licenses/IBMPlexMono-OFL.txt"),
-    BundledFont("Cascadia Mono", "OFL-1.1", "licenses/CascadiaMono-OFL.txt"),
-    BundledFont("Inconsolata", "OFL-1.1", "licenses/Inconsolata-OFL.txt"),
-    BundledFont("Symbols Nerd Font Mono", "MIT", "licenses/SymbolsNerdFont-LICENSE.txt"),
+    BundledAsset("JetBrains Mono", "OFL-1.1", "licenses/JetBrainsMono-OFL.txt"),
+    BundledAsset("Fira Code", "OFL-1.1", "licenses/FiraCode-OFL.txt"),
+    BundledAsset("Hack", "MIT + Bitstream Vera", "licenses/Hack-LICENSE.md"),
+    BundledAsset("Source Code Pro", "OFL-1.1", "licenses/SourceCodePro-OFL.md"),
+    BundledAsset("IBM Plex Mono", "OFL-1.1", "licenses/IBMPlexMono-OFL.txt"),
+    BundledAsset("Cascadia Mono", "OFL-1.1", "licenses/CascadiaMono-OFL.txt"),
+    BundledAsset("Inconsolata", "OFL-1.1", "licenses/Inconsolata-OFL.txt"),
+    BundledAsset("Symbols Nerd Font Mono", "MIT", "licenses/SymbolsNerdFont-LICENSE.txt"),
 )
+
+/**
+ * The key bar's icons. Lucide is ISC, and the icons it took from Feather stay MIT, some of which are
+ * in the set, so both are named.
+ */
+internal val BundledIcons = BundledAsset("Lucide", "ISC + MIT", "licenses/Lucide-LICENSE.txt")
 
 /**
  * Names for groups whose id says little to a reader. The rest are named by rule in [groupName];
@@ -135,21 +141,21 @@ internal fun parseLibraryDefinitions(json: String): List<OpenSourceNotice> {
     }
 }
 
-/** Fonts first, then libraries by name: the order the About screen lists them in. */
+/** Fonts first, then the icons, then libraries by name: the order the About screen lists them in. */
 internal fun openSourceNotices(
     libraryDefinitions: String,
     readAsset: (String) -> String,
 ): List<OpenSourceNotice> {
-    val fonts = BundledFonts.map { font ->
-        OpenSourceNotice(
-            name = font.name,
-            detail = "Font",
-            parts = emptyList(),
-            licenses = listOf(NoticeLicense(label = font.license, name = font.license, text = reflowLicense(readAsset(font.asset)))),
-            isFont = true,
-        )
-    }
-    return fonts + parseLibraryDefinitions(libraryDefinitions).sortedBy { it.name.lowercase() }
+    fun notice(bundled: BundledAsset, detail: String, isFont: Boolean) = OpenSourceNotice(
+        name = bundled.name,
+        detail = detail,
+        parts = emptyList(),
+        licenses = listOf(NoticeLicense(label = bundled.license, name = bundled.license, text = reflowLicense(readAsset(bundled.asset)))),
+        isFont = isFont,
+    )
+    val fonts = BundledFonts.map { notice(it, "Font", isFont = true) }
+    val icons = notice(BundledIcons, "Icons", isFont = false)
+    return fonts + icons + parseLibraryDefinitions(libraryDefinitions).sortedBy { it.name.lowercase() }
 }
 
 /** Everything the About screen reads from the APK, loaded together off the main thread. */

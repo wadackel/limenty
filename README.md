@@ -41,7 +41,8 @@ icons.
 - **Key bar sets.** A row of keys above the keyboard, with arrows pinned on the right. Keep
   several named sets and swipe the bar up or down to switch between them.
 - **Keys that send more than one key.** A single button can send `Ctrl-b` then `c`, or type
-  `git status`, under whatever label you give it.
+  `git status`, under whatever label you give it, or as one of 65 icons so more keys fit on the
+  bar.
 - **A drag arrow pad.** Long-press and slide to send repeating arrow keys in that direction.
 - **Gestures you choose.** Fourteen gestures, from double tap to two-finger swipes and pinch,
   each bound to an action: show the keyboard, paste, scroll, zoom the font, or send a key.

@@ -1,4 +1,4 @@
-Bundled fonts and their licences.
+Bundled fonts and icons, and their licences.
 
 JetBrains Mono   SIL Open Font License 1.1   JetBrainsMono-OFL.txt
 Fira Code        SIL Open Font License 1.1   FiraCode-OFL.txt
@@ -9,6 +9,8 @@ Cascadia Mono    SIL Open Font License 1.1   CascadiaMono-OFL.txt
 Inconsolata      SIL Open Font License 1.1   Inconsolata-OFL.txt
 Symbols Nerd Font Mono
                  MIT (Nerd Fonts project)    SymbolsNerdFont-LICENSE.txt
+Lucide 1.80.0    ISC, and MIT for the icons  Lucide-LICENSE.txt
+                 derived from Feather
 
 The symbols face is shipped separately from the text faces rather than using the
 patched "Nerd Font" builds: one 2.4 MB symbols file serves every text font, where the

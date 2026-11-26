@@ -27,20 +27,27 @@ fun AuxiliaryKey(
  * immediately, so the bar has no hidden state the user has to track. The label is separate from
  * the steps so a button can read `Clear` while sending Ctrl+L, and so a button that sends several
  * things can be called something shorter than the list of them.
+ *
+ * [icon] is drawn in place of the label wherever the key is drawn as a key; the label is still its
+ * name wherever it is named in words. A key with an icon and no name of its own is named by the icon.
  */
 data class AuxiliaryKey(
     override val label: String,
     val steps: List<KeyStep>,
+    override val icon: KeyIcon? = null,
 ) : KeyBarSlot {
     fun toEvents(): List<TerminalInputEvent> = steps.mapNotNull { it.toEvent() }
 
     /**
-     * Whether the owner named this key, rather than letting its steps name it.
+     * Whether the owner named this key, rather than letting its icon, or its steps when it has
+     * none, name it.
      *
      * Read off the key instead of stored, so a bar written by hand behaves like one edited in the
-     * app. Blank counts as following, because a nameless key has nothing of its own to keep.
+     * app. Blank counts as following, because a nameless key has nothing of its own to keep. A
+     * typed name that matches the icon's reads as the icon's, and goes with the icon if it is
+     * taken off; a flag saying which it was would be one more field for every saved key.
      */
-    fun hasOwnName(): Boolean = label.isNotBlank() && label != labelFor(steps)
+    fun hasOwnName(): Boolean = label.isNotBlank() && label != (icon?.label ?: labelFor(steps))
 
     /**
      * What a screen reader should say, which is not what the face shows.
@@ -49,7 +56,11 @@ data class AuxiliaryKey(
      * worse than saying "Left". The substitution stops at a key the owner named, though — someone
      * who calls a key `Clear` wants to hear `Clear`, not `Escape`.
      */
-    override fun spoken(): String = if (hasOwnName()) label else spokenFor(steps).ifEmpty { "Unassigned" }
+    override fun spoken(): String = when {
+        hasOwnName() -> label
+        icon != null -> icon.label
+        else -> spokenFor(steps).ifEmpty { "Unassigned" }
+    }
 
     companion object {
         /**
@@ -216,7 +227,9 @@ data class AuxiliaryKey(
          *
          * A group keeps its name under `label` and has no `steps`, which is how a build without
          * groups reads it: a key with the group's name that sends nothing, rather than a bar it
-         * cannot read and replaces with the defaults.
+         * cannot read and replaces with the defaults. An icon goes under `icon` beside the label for
+         * the same reason: a build without icons ignores the field and shows the name. A group named
+         * only by its icon keeps an empty `label`, so such a build calls it by its keys instead.
          */
         fun encodeBar(slots: List<KeyBarSlot>): String {
             val array = JSONArray()
@@ -226,6 +239,7 @@ data class AuxiliaryKey(
                         is AuxiliaryKey -> encodeKey(slot)
                         is KeyGroup -> JSONObject()
                             .put("label", slot.name)
+                            .putIcon(slot.icon)
                             .put("group", JSONArray().also { members -> slot.keys.forEach { members.put(encodeKey(it)) } })
                     },
                 )
@@ -233,7 +247,15 @@ data class AuxiliaryKey(
             return array.toString()
         }
 
-        private fun encodeKey(key: AuxiliaryKey): JSONObject = JSONObject().put("label", key.label).put("steps", KeyStepJson.encodeAll(key.steps))
+        private fun encodeKey(key: AuxiliaryKey): JSONObject = JSONObject()
+            .put("label", key.label)
+            .putIcon(key.icon)
+            .put("steps", KeyStepJson.encodeAll(key.steps))
+
+        private fun JSONObject.putIcon(icon: KeyIcon?): JSONObject = if (icon == null) this else put("icon", icon.id)
+
+        /** An icon this build does not ship is read as none, so the key shows its name instead. */
+        private fun JSONObject.icon(): KeyIcon? = optString("icon").takeIf { it.isNotEmpty() }?.let(KeyIcon::byId)
 
         /**
          * Reads both shapes, because the older one is what is on the owner's phone.
@@ -253,6 +275,7 @@ data class AuxiliaryKey(
                     KeyGroup(
                         name = item.getString("label"),
                         keys = (0 until members.length()).map { decodeKey(members.getJSONObject(it)) },
+                        icon = item.icon(),
                     )
                 }
             }
@@ -267,6 +290,7 @@ data class AuxiliaryKey(
                 } else {
                     KeyStepJson.decodeAll(stored)
                 },
+                icon = item.icon(),
             )
         }
     }

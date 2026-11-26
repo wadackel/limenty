@@ -66,6 +66,8 @@ fun LimentyField(
     keyboardActions: KeyboardActions = KeyboardActions.Default,
     visualTransformation: VisualTransformation = VisualTransformation.None,
     trailing: (@Composable () -> Unit)? = null,
+    /** Before the label and the value, inside the field's surface. */
+    leading: (@Composable () -> Unit)? = null,
     /** Why the value is not accepted, said under the field. Null while there is nothing to say. */
     error: String? = null,
 ) {
@@ -107,6 +109,9 @@ fun LimentyField(
                 verticalAlignment = Alignment.Bottom,
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
+                if (leading != null) {
+                    Box(modifier = Modifier.align(Alignment.CenterVertically).padding(end = 12.dp)) { leading() }
+                }
                 Column(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(5.dp),
