@@ -15,6 +15,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isDialog
@@ -27,6 +28,7 @@ import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeDown
+import androidx.compose.ui.test.swipeUp
 import androidx.compose.ui.unit.dp
 import dev.wadackel.limenty.core.input.TerminalKey
 import dev.wadackel.limenty.data.AuxiliaryKey
@@ -223,6 +225,26 @@ class KeySlotSheetTest {
         press("Save")
 
         assertEquals(listOf(sym), preferences.keySet.pinned)
+    }
+
+    /**
+     * A finger scrolling the content back up keeps the sheet where it is when the top arrives
+     * before the finger stops: only a pull that starts at the top moves the sheet.
+     */
+    @Test
+    @Config(qualifiers = "w411dp-h560dp-420dpi")
+    fun scrollingTheContentBackToTheTopLeavesTheSheetOpen() {
+        show(KeySet("Default", scrolling = listOf(esc), pinned = emptyList()))
+
+        press("Esc")
+        val content = rule.onNode(hasScrollAction() and hasAnyAncestor(isDialog()))
+        content.performTouchInput { swipeUp(startY = bottom - 10f, endY = top + 10f) }
+        rule.waitForIdle()
+        content.performTouchInput { swipeDown(startY = top + 10f, endY = bottom - 10f, durationMillis = 150) }
+        rule.waitForIdle()
+
+        rule.onNode(isDialog()).assertExists()
+        rule.onNode(hasText("Discard changes?")).assertDoesNotExist()
     }
 
     /** Both parts of one edit are kept: the old Pin right moved the key and dropped the label. */

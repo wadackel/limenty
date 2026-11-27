@@ -2,6 +2,7 @@ package dev.wadackel.limenty.ui.components
 
 import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.spring
@@ -90,6 +91,9 @@ class LimentySheetState internal constructor(private val scope: CoroutineScope) 
 
     private var motion: Job? = null
 
+    /** The speed a finger let go at, while the close it asked for is being decided. */
+    private var releaseVelocity = 0f
+
     /** How much of the sheet shows, from 0 lowered out of sight to 1 open. */
     internal val shown: Float get() = if (offset.isNaN() || height <= 0f) 0f else 1f - offset / height
 
@@ -100,9 +104,12 @@ class LimentySheetState internal constructor(private val scope: CoroutineScope) 
         motion?.cancel()
         motion = scope.launch {
             if (!offset.isNaN()) {
-                animate(offset, height, animationSpec = tween(LimentyMotion.TRANSITION_MILLIS, easing = FastOutLinearInEasing)) { value, _ ->
-                    offset = value
+                val spec = if (releaseVelocity > 0f) {
+                    closingSpec(height - offset, releaseVelocity)
+                } else {
+                    tween(LimentyMotion.TRANSITION_MILLIS, easing = FastOutLinearInEasing)
                 }
+                animate(offset, height, animationSpec = spec) { value, _ -> offset = value }
             }
             then()
         }
@@ -115,8 +122,18 @@ class LimentySheetState internal constructor(private val scope: CoroutineScope) 
 
     internal fun rise() = moveTo(0f, tween(LimentyMotion.TRANSITION_MILLIS, easing = LinearOutSlowInEasing))
 
-    /** Back to open, carrying on at the speed the finger let go at. */
-    internal fun settle(velocity: Float) = moveTo(0f, spring(stiffness = SETTLE_STIFFNESS), velocity)
+    /**
+     * A finger let go of the sheet: asks [onCloseRequest] when it went far or fast enough, and goes
+     * back up unless that hid it — as when there are changes to keep, and the sheet rises to ask.
+     */
+    internal fun release(velocity: Float, closes: Boolean, onCloseRequest: () -> Unit) {
+        if (closes) {
+            releaseVelocity = velocity
+            onCloseRequest()
+            releaseVelocity = 0f
+        }
+        moveTo(0f, spring(stiffness = SETTLE_STIFFNESS), velocity)
+    }
 
     /** Follows the finger, taking over from whatever the sheet was doing; returns what it used. */
     internal fun dragBy(delta: Float): Float {
@@ -169,9 +186,8 @@ fun LimentySheet(
 ) {
     val flingToClose = with(LocalDensity.current) { CLOSING_FLING.toPx() }
     val release: (Float) -> Unit = { velocity ->
-        if (state.offset > 0f && (velocity > flingToClose || state.offset > state.height * CLOSING_SHARE)) onCloseRequest()
-        // Asked to close and told no, as when there are changes to keep: back up to ask.
-        state.settle(velocity)
+        val closes = state.offset > 0f && (velocity > flingToClose || state.offset > state.height * CLOSING_SHARE)
+        state.release(velocity, closes, onCloseRequest)
     }
     val nestedScroll = remember(state, release) { SheetNestedScroll(state, release) }
 
@@ -249,22 +265,32 @@ private fun ColumnScope.Handle() {
 }
 
 /**
- * Hands the sheet what its content does not use: a pull down past the top of the content lowers
- * the sheet, and a push up raises a lowered sheet before the content scrolls.
+ * Hands the sheet what its content does not use: a pull down that starts at the top of the content
+ * lowers the sheet, and a push up raises a lowered sheet before the content scrolls.
+ *
+ * A finger that has scrolled the content in this gesture never moves the sheet, even once the top
+ * arrives under it: a quick scroll back up would otherwise carry on into the sheet and fling it shut.
  */
 private class SheetNestedScroll(
     private val state: LimentySheetState,
     private val release: (Float) -> Unit,
 ) : NestedScrollConnection {
+    private var contentScrolled = false
+
     override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset = if (available.y < 0f && source == NestedScrollSource.UserInput && state.offset > 0f) {
         Offset(0f, state.dragBy(available.y))
     } else {
         Offset.Zero
     }
 
-    override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset = if (available.y > 0f && source == NestedScrollSource.UserInput) Offset(0f, state.dragBy(available.y)) else Offset.Zero
+    override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+        if (source != NestedScrollSource.UserInput) return Offset.Zero
+        if (consumed.y != 0f) contentScrolled = true
+        return if (available.y > 0f && !contentScrolled) Offset(0f, state.dragBy(available.y)) else Offset.Zero
+    }
 
     override suspend fun onPreFling(available: Velocity): Velocity {
+        contentScrolled = false
         if (state.offset <= 0f) return Velocity.Zero
         release(available.y)
         return available
@@ -342,3 +368,22 @@ private val CLOSING_FLING = 1000.dp
 private const val CLOSING_SHARE = 0.4f
 
 private const val SETTLE_STIFFNESS = 800f
+
+/** The quickest a flung sheet is lowered in, however fast the finger. */
+private const val CLOSING_MIN_MILLIS = 120
+
+/** The longest, for a finger that let go slowly or not at all. */
+internal const val CLOSING_MAX_MILLIS = 300
+
+/**
+ * How a released sheet is lowered across [distance] pixels: at the speed the finger let go at, so
+ * a flick leaves quickly and a slow pull slowly, kept between the two limits above.
+ */
+internal fun closingSpec(distance: Float, velocity: Float): AnimationSpec<Float> {
+    val millis = if (velocity > 0f) distance / velocity * 1000f else Float.POSITIVE_INFINITY
+    return if (millis <= CLOSING_MAX_MILLIS) {
+        tween(millis.toInt().coerceAtLeast(CLOSING_MIN_MILLIS), easing = LinearEasing)
+    } else {
+        tween(CLOSING_MAX_MILLIS, easing = FastOutLinearInEasing)
+    }
+}
