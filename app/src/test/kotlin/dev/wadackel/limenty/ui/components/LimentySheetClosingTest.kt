@@ -1,35 +1,31 @@
 package dev.wadackel.limenty.ui.components
 
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.TweenSpec
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** A sheet let go of on its way down leaves at the speed the finger left it, within limits. */
+/** A sheet let go of on its way down falls on from the finger's speed and keeps speeding up. */
 class LimentySheetClosingTest {
-    private fun millis(distance: Float, velocity: Float) = (closingSpec(distance, velocity) as TweenSpec).durationMillis
+    private val height = 1000f
 
     @Test
-    fun aFasterFlingLowersTheSheetSooner() {
-        assertTrue(millis(1000f, 8000f) < millis(1000f, 4000f))
+    fun aSheetStartsFallingAtTheSpeedTheFingerLetGoAt() {
+        val firstFrame = 0.004f
+        assertEquals(5000f * firstFrame, fallenBy(firstFrame, 5000f, height), 1f)
     }
 
     @Test
-    fun aFlungSheetCarriesOnAtTheFingersSpeed() {
-        val spec = closingSpec(1000f, 5000f) as TweenSpec
-        assertEquals(200, spec.durationMillis)
-        assertEquals(LinearEasing, spec.easing)
+    fun aFasterFlickFallsFurtherInTheSameTime() {
+        assertTrue(fallenBy(0.05f, 8000f, height) > fallenBy(0.05f, 2000f, height))
     }
 
     @Test
-    fun aVeryFastFlingStillTakesLongEnoughToBeSeen() {
-        assertEquals(120, millis(1000f, 100_000f))
+    fun aSheetLetGoAtRestFallsItsHeightInAQuarterSecond() {
+        assertEquals(height, fallenBy(0.25f, 0f, height), 1f)
     }
 
     @Test
-    fun aSheetLetGoSlowlyOrAtRestTakesTheLongestTime() {
-        assertEquals(CLOSING_MAX_MILLIS, millis(1000f, 500f))
-        assertEquals(CLOSING_MAX_MILLIS, millis(1000f, 0f))
+    fun aFingerMovingUpWhenLetGoIsTakenAsAtRest() {
+        assertEquals(fallenBy(0.1f, 0f, height), fallenBy(0.1f, -3000f, height), 0.01f)
     }
 }

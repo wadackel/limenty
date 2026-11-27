@@ -2,7 +2,6 @@ package dev.wadackel.limenty.ui.components
 
 import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.FastOutLinearInEasing
-import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.spring
@@ -44,6 +43,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -92,7 +92,19 @@ class LimentySheetState internal constructor(private val scope: CoroutineScope) 
     private var motion: Job? = null
 
     /** The speed a finger let go at, while the close it asked for is being decided. */
-    private var releaseVelocity = 0f
+    private var releaseVelocity: Float? = null
+
+    /** Carries on from where the finger let go, at its speed, and keeps speeding up until gone. */
+    private suspend fun fall(velocity: Float) {
+        val from = offset
+        var start = -1L
+        while (offset < height) {
+            withFrameNanos { now ->
+                if (start < 0L) start = now
+                offset = (from + fallenBy((now - start) / 1e9f, velocity, height)).coerceAtMost(height)
+            }
+        }
+    }
 
     /** How much of the sheet shows, from 0 lowered out of sight to 1 open. */
     internal val shown: Float get() = if (offset.isNaN() || height <= 0f) 0f else 1f - offset / height
@@ -102,14 +114,15 @@ class LimentySheetState internal constructor(private val scope: CoroutineScope) 
         if (hiding) return
         hiding = true
         motion?.cancel()
+        // Read now: the release that asked for this hide resets it as soon as this returns.
+        val released = releaseVelocity
         motion = scope.launch {
-            if (!offset.isNaN()) {
-                val spec = if (releaseVelocity > 0f) {
-                    closingSpec(height - offset, releaseVelocity)
-                } else {
-                    tween(LimentyMotion.TRANSITION_MILLIS, easing = FastOutLinearInEasing)
+            when {
+                offset.isNaN() -> Unit
+                released != null -> fall(released)
+                else -> animate(offset, height, animationSpec = tween(LimentyMotion.TRANSITION_MILLIS, easing = FastOutLinearInEasing)) { value, _ ->
+                    offset = value
                 }
-                animate(offset, height, animationSpec = spec) { value, _ -> offset = value }
             }
             then()
         }
@@ -130,7 +143,7 @@ class LimentySheetState internal constructor(private val scope: CoroutineScope) 
         if (closes) {
             releaseVelocity = velocity
             onCloseRequest()
-            releaseVelocity = 0f
+            releaseVelocity = null
         }
         moveTo(0f, spring(stiffness = SETTLE_STIFFNESS), velocity)
     }
@@ -369,21 +382,16 @@ private const val CLOSING_SHARE = 0.4f
 
 private const val SETTLE_STIFFNESS = 800f
 
-/** The quickest a flung sheet is lowered in, however fast the finger. */
-private const val CLOSING_MIN_MILLIS = 120
-
-/** The longest, for a finger that let go slowly or not at all. */
-internal const val CLOSING_MAX_MILLIS = 300
+/** How long a sheet let go at rest takes to fall its own height. */
+private const val FALL_MILLIS = 250
 
 /**
- * How a released sheet is lowered across [distance] pixels: at the speed the finger let go at, so
- * a flick leaves quickly and a slow pull slowly, kept between the two limits above.
+ * How far a sheet let go at [velocity] pixels a second has fallen after [seconds]: it starts at the
+ * finger's speed, never slower, and speeds up at a rate set by its [height], so a tall sheet and a
+ * short one take the same time to fall from rest.
  */
-internal fun closingSpec(distance: Float, velocity: Float): AnimationSpec<Float> {
-    val millis = if (velocity > 0f) distance / velocity * 1000f else Float.POSITIVE_INFINITY
-    return if (millis <= CLOSING_MAX_MILLIS) {
-        tween(millis.toInt().coerceAtLeast(CLOSING_MIN_MILLIS), easing = LinearEasing)
-    } else {
-        tween(CLOSING_MAX_MILLIS, easing = FastOutLinearInEasing)
-    }
+internal fun fallenBy(seconds: Float, velocity: Float, height: Float): Float {
+    val fall = FALL_MILLIS / 1000f
+    val acceleration = 2f * height / (fall * fall)
+    return velocity.coerceAtLeast(0f) * seconds + acceleration * seconds * seconds / 2f
 }
